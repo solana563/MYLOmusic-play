@@ -1,0 +1,2 @@
+/* Scratch file — the lyrics resolver that shipped lives inline in index.html
+   (see the "LYRICS RESOLVER" section). This file is safe to delete. */

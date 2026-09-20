@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MYLO — Offline</title>
+<meta name="theme-color" content="#0c0a12">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+  :root{--vio:#e60023;--bg:#0c0a12;--mut:#8b86a0}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:#f4f1fa;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+       display:grid;place-items:center;padding:28px;text-align:center}
+  .w{max-width:380px;animation:in .5s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  svg{width:190px;height:auto;margin:0 auto 22px;display:block;filter:drop-shadow(0 8px 26px rgba(0,0,0,.6))}
+  .ring{width:74px;height:74px;border-radius:24px;margin:0 auto 20px;display:grid;place-items:center;
+        background:linear-gradient(140deg,rgba(230,0,35,.9),rgba(123,31,162,.85));font-size:26px}
+  h1{font-size:21px;font-weight:800;margin-bottom:10px}
+  p{color:var(--mut);font-size:13.5px;line-height:1.7;margin-bottom:8px}
+  b{color:#fff}
+  .list{text-align:left;margin:20px 0 22px;display:flex;flex-direction:column;gap:9px}
+  .row{display:flex;gap:11px;align-items:flex-start;font-size:12.5px;line-height:1.6;color:#c3bdd4;
+       background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:15px;padding:11px 13px}
+  .row i{color:var(--vio);width:16px;flex-shrink:0;margin-top:2px}
+  button{width:100%;padding:14px;border:0;border-radius:16px;background:var(--vio);color:#fff;
+         font:inherit;font-weight:700;font-size:14px;cursor:pointer}
+  small{display:block;color:#5f5a72;font-size:11px;margin-top:14px}
+</style>
+</head>
+<body>
+  <div class="w">
+    <svg viewBox="-40 303 638 274" role="img" aria-label="MYLO" fill="#ffffff">
+      <path d="M10,353 H133 L153,438 L174,353 H347 L360,423 L373,353 H467 V435 H429 L428,360 L390,476 H335 L350,457 H319 L289,361 V526 H200 L199,433 L176,526 H117 L96,436 L94,526 H10 Z"/>
+      <path fill-rule="evenodd" d="M466,378 C470,362 490,354 512,354 C538,354 556,366 556,388 C556,410 540,422 516,422 C492,422 470,415 466,398 Z M501.0,374.0 Q501.0,370.5 504.0,372.0 L529.0,386.3 Q532.0,388.0 529.0,389.7 L504.0,403.8 Q501.0,405.5 501.0,402.0 Z"/>
+    </svg>
+    <div class="ring"><i>&#9888;</i></div>
+    <h1>You&rsquo;re offline</h1>
+    <p>MYLO needs a connection the first time it opens. After that it runs from cache.</p>
+    <div class="list">
+      <div class="row"><i>1</i><span>Reconnect to Wi-Fi or mobile data.</span></div>
+      <div class="row"><i>2</i><span><b>Your imported songs still play</b> once the app loads — they live on this device.</span></div>
+      <div class="row"><i>3</i><span>Radio and YouTube need the network; there&rsquo;s no way around that one.</span></div>
+    </div>
+    <button onclick="location.reload()">Try again</button>
+    <small>MYLO &middot; offline shell</small>
+  </div>
+  <script>
+    /* Auto-recover the moment connectivity returns. */
+    window.addEventListener('online', function () { location.reload(); });
+  </script>
+</body>
+</html>

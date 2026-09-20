@@ -1,0 +1,60 @@
+{
+  "id": "/?tab=home",
+  "name": "MYLO — Radio · Video · Your Music",
+  "short_name": "MYLO",
+  "description": "Worldwide internet radio, YouTube and your own local audio files in one local-first player with gapless playback and synced lyrics.",
+  "start_url": "./index.html?tab=home",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#0c0a12",
+  "theme_color": "#0c0a12",
+  "categories": ["music", "entertainment", "multimedia"],
+  "lang": "en",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "assets/icons/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Radio",
+      "short_name": "Radio",
+      "description": "Jump straight to worldwide radio",
+      "url": "./index.html?tab=radio",
+      "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Library",
+      "short_name": "Library",
+      "description": "Open your local music library",
+      "url": "./index.html?tab=library",
+      "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "assets/screenshots/home.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Listen Now feed"
+    },
+    {
+      "src": "assets/screenshots/lyrics.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Synced lyrics"
+    }
+  ],
+  "share_target": {
+    "action": "./index.html",
+    "method": "GET",
+    "params": { "title": "share_title", "text": "share_text", "url": "share_url" }
+  }
+}

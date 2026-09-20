@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MYLO — Icon Generator</title>
+<style>
+  body{background:#0c0a12;color:#f4f1fa;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+       margin:0;padding:32px 22px 80px;line-height:1.6}
+  .w{max-width:760px;margin:0 auto}
+  h1{font-size:24px;margin:0 0 6px}
+  h2{font-size:15px;margin:32px 0 10px;color:#fff}
+  p,li{color:#b3adc4;font-size:13.5px}
+  code{background:#211c2e;padding:2px 7px;border-radius:6px;font-size:12.5px;color:#ffc861}
+  pre{background:#17141f;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px 16px;overflow-x:auto;font-size:12.5px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:16px;margin-top:14px}
+  .cell{background:#17141f;border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:14px;text-align:center}
+  .cell span{display:block;font-size:11px;color:#8b86a0;margin-top:9px}
+  canvas{max-width:100%;border-radius:10px;background:#000}
+  .circle{display:grid;place-items:center;aspect-ratio:1;background:#3a3a44;border-radius:50%;overflow:hidden}
+  .circle canvas{border-radius:0}
+  button{margin-top:10px;width:100%;padding:9px;border:0;border-radius:10px;background:#e60023;color:#fff;
+         font:inherit;font-weight:700;font-size:12.5px;cursor:pointer}
+  button.alt{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14)}
+  .note{background:rgba(255,176,46,.12);border:1px solid rgba(255,176,46,.3);border-radius:14px;padding:12px 15px;color:#ffc861;font-size:12.5px;margin-top:18px}
+</style>
+</head>
+<body>
+<div class="w">
+  <h1>MYLO — icon generator</h1>
+  <p>Renders the official wordmark to <strong>real PNG files</strong> for the PWA manifest and native shells.
+     Canvas rasterising (not SVG) because Chrome's installability check rejects SVG manifest icons.</p>
+
+  <div class="note">Run this page over <code>http(s)</code> (or open the file directly — no server needed) and use the
+    download buttons. Commit the results into <code>assets/icons/</code>.</div>
+
+  <h2>Required files</h2>
+  <ul>
+    <li><code>assets/icons/icon-192.png</code> — 192×192, <code>purpose: any</code></li>
+    <li><code>assets/icons/icon-512.png</code> — 512×512, <code>purpose: any</code></li>
+    <li><code>assets/icons/icon-maskable-512.png</code> — 512×512, <code>purpose: maskable</code> (60% inset so Android's circle crop is safe)</li>
+    <li><code>resources/icon.png</code> — 1024×1024 source for <code>@capacitor/assets</code> (adaptive layers + splash)</li>
+  </ul>
+
+  <h2>Preview &amp; download</h2>
+  <div class="grid" id="grid"></div>
+
+  <h2>After generating</h2>
+  <pre># PWA / web
+npx serve .            # verify the manifest in DevTools → Application
+
+# Native icons + splash from the 1024px source
+npm run assets
+npm run sync</pre>
+</div>
+
+<script>
+/* ---- official wordmark geometry (keep in sync with index.html) ---- */
+var LOGO_VB='-40 303 638 274';
+var LOGO_W=638, LOGO_H=274;
+var LOGO_D1='M10,353 H133 L153,438 L174,353 H347 L360,423 L373,353 H467 V435 H429 L428,360 L390,476 H335 L350,457 H319 L289,361 V526 H200 L199,433 L176,526 H117 L96,436 L94,526 H10 Z';
+var LOGO_D2='M466,378 C470,362 490,354 512,354 C538,354 556,366 556,388 C556,410 540,422 516,422 C492,422 470,415 466,398 Z M501.0,374.0 Q501.0,370.5 504.0,372.0 L529.0,386.3 Q532.0,388.0 529.0,389.7 L504.0,403.8 Q501.0,405.5 501.0,402.0 Z';
+
+function render(size,mask,radiusPct){
+  var c=document.createElement('canvas');
+  c.width=c.height=size;
+  var x=c.getContext('2d');
+  x.fillStyle='#000000';
+  if(mask){x.fillRect(0,0,size,size)}
+  else{
+    var r=size*(radiusPct==null?0.22:radiusPct);
+    x.beginPath();
+    if(x.roundRect)x.roundRect(0,0,size,size,r);
+    else{x.moveTo(r,0);x.arcTo(size,0,size,size,r);x.arcTo(size,size,0,size,r);x.arcTo(0,size,0,0,r);x.arcTo(0,0,size,0,r);x.closePath()}
+    x.fill();
+  }
+  var inset=mask?0.60:0.74;
+  var scale=(size*inset)/LOGO_W;
+  var w=LOGO_W*scale,h=LOGO_H*scale;
+  x.save();
+  x.translate((size-w)/2+40*scale,(size-h)/2-303*scale);
+  x.scale(scale,scale);
+  x.fillStyle='#ffffff';
+  x.fill(new Path2D(LOGO_D1));
+  x.fill(new Path2D(LOGO_D2),'evenodd');   /* play-triangle cut-out */
+  x.restore();
+  return c;
+}
+
+var JOBS=[
+  {file:'icon-192.png',size:192,mask:false,radius:0.22,label:'192 × 192 · any',circle:false},
+  {file:'icon-512.png',size:512,mask:false,radius:0.22,label:'512 × 512 · any',circle:false},
+  {file:'icon-maskable-512.png',size:512,mask:true,radius:0,label:'512 × 512 · maskable',circle:true},
+  {file:'icon-1024.png',size:1024,mask:true,radius:0,label:'1024 × 1024 · native source',circle:false}
+];
+
+var grid=document.getElementById('grid');
+JOBS.forEach(function(job){
+  var cell=document.createElement('div');
+  cell.className='cell';
+  var holder=document.createElement('div');
+  if(job.circle)holder.className='circle';
+  var canvas=render(job.size,job.mask,job.radius);
+  holder.appendChild(canvas);
+  var label=document.createElement('span');
+  label.textContent=job.label;
+  var btn=document.createElement('button');
+  btn.textContent='Download '+job.file;
+  btn.onclick=function(){
+    canvas.toBlob(function(blob){
+      var a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=job.file;
+      a.click();
+      setTimeout(function(){URL.revokeObjectURL(a.href)},4000);
+    },'image/png');
+  };
+  cell.appendChild(holder);cell.appendChild(label);cell.appendChild(btn);
+  grid.appendChild(cell);
+});
+
+/* Download them all in one go (some browsers will ask permission). */
+var all=document.createElement('button');
+all.className='alt';
+all.textContent='Download all 4 files';
+all.style.cssText+=';max-width:260px;margin-top:18px;padding:12px';
+all.onclick=function(){
+  JOBS.forEach(function(job,i){
+    setTimeout(function(){
+      render(job.size,job.mask,job.radius).toBlob(function(blob){
+        var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+        a.download=job.file;a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},4000);
+      },'image/png');
+    },i*420);
+  });
+};
+grid.parentNode.appendChild(all);
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+# MYLO
+User-agent: *
+Allow: /
+
+# Auth callbacks and deep links carry tokens — never index them.
+Disallow: /*?*access_token=
+Disallow: /*#access_token
+Disallow: /auth-callback
+
+Sitemap: https://mylo.app/sitemap.xml

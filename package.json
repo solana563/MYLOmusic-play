@@ -1,0 +1,44 @@
+{
+  "name": "mylo-music",
+  "version": "1.0.0",
+  "description": "MYLO — Internet Radio, YouTube, and Local Music Super-App",
+  "main": "index.html",
+  "scripts": {
+    "build": "echo 'Building web assets...'",
+    "cap:sync": "cap sync",
+    "cap:open:android": "cap open android",
+    "cap:open:ios": "cap open ios",
+    "cap:run:android": "cap run android",
+    "cap:run:ios": "cap run ios",
+    "build:android": "cap sync android && cd android && ./gradlew assembleRelease",
+    "build:android:bundle": "cap sync android && cd android && ./gradlew bundleRelease"
+  },
+  "keywords": [
+    "music",
+    "radio",
+    "youtube",
+    "player",
+    "local-first",
+    "audio",
+    "capacitor",
+    "android",
+    "ios"
+  ],
+  "author": "MYLO",
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/app": "^6.0.0",
+    "@capacitor/browser": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/filesystem": "^6.0.0",
+    "@capacitor/haptics": "^6.0.0",
+    "@capacitor/ios": "^6.0.0",
+    "@capacitor/keyboard": "^6.0.0",
+    "@capacitor/splash-screen": "^6.0.0",
+    "@capacitor/status-bar": "^6.0.0",
+    "@supabase/supabase-js": "^2.43.0",
+    "jsmediatags": "^3.9.5"
+  }
+}

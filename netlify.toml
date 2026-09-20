@@ -1,0 +1,35 @@
+# MYLO — Netlify deployment
+# Headers themselves live in ./_headers (shared with Cloudflare Pages).
+
+[build]
+  publish = "."
+  command = "echo 'MYLO is a static single-file app — nothing to build.'"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-store, max-age=0"
+    Service-Worker-Allowed = "/"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+    Content-Type = "application/manifest+json"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# SPA-ish routing: unknown paths fall through to the 404 page, never to the
+# app itself (the app is a single URL with a ?tab= query).
+[[redirects]]
+  from = "/*"
+  to = "/404.html"
+  status = 404

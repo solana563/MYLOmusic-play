@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">MYLO</string>
+    <string name="title_activity_main">MYLO</string>
+    <string name="package_name">com.mylo.music</string>
+    <string name="custom_url_scheme">mylo</string>
+</resources>
