@@ -1,0 +1,35 @@
+# ---- secrets (NEVER commit) ----
+android/keystore.properties
+*.jks
+*.keystore
+ios/App/App/ExportOptions.plist
+.env
+.env.*
+
+# ---- native build output ----
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/capacitor-cordova-android-plugins/
+ios/App/Pods/
+ios/App/App/public/
+ios/App/build/
+ios/App/DerivedData/
+ios/App/*.xcworkspace/xcuserdata/
+ios/App/*.xcodeproj/xcuserdata/
+*.ipa
+*.aab
+*.apk
+
+# ---- node ----
+node_modules/
+npm-debug.log*
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
