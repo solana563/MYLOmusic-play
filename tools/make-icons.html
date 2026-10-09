@@ -61,27 +61,9 @@ function render(size,mask,radiusPct){
   var c=document.createElement('canvas');
   c.width=c.height=size;
   var x=c.getContext('2d');
-  x.fillStyle='#000000';
-  if(mask){x.fillRect(0,0,size,size)}
-  else{
-    var r=size*(radiusPct==null?0.22:radiusPct);
-    x.beginPath();
-    if(x.roundRect)x.roundRect(0,0,size,size,r);
-    else{x.moveTo(r,0);x.arcTo(size,0,size,size,r);x.arcTo(size,size,0,size,r);x.arcTo(0,size,0,0,r);x.arcTo(0,0,size,0,r);x.closePath()}
-    x.fill();
-  }
   var inset=mask?0.60:0.74;
   var w=size*inset,h=w;
-  x.save();
-  if(!mask){
-    var r=size*(radiusPct==null?0.22:radiusPct);
-    x.beginPath();
-    if(x.roundRect)x.roundRect(0,0,size,size,r);
-    else{x.moveTo(r,0);x.arcTo(size,0,size,size,r);x.arcTo(size,size,0,size,r);x.arcTo(0,size,0,0,r);x.arcTo(0,0,size,0,r);x.closePath()}
-    x.clip();
-  }
   x.drawImage(logoImage,(size-w)/2,(size-h)/2,w,h);
-  x.restore();
   return c;
 }
 

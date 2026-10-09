@@ -7,7 +7,7 @@
    ========================================================================== */
 
 /* Bump this on every release — it is what evicts the previous cache. */
-const VERSION      = 'v1.0.6';
+const VERSION      = 'v1.0.7';
 const SHELL_CACHE  = 'mylo-shell-'  + VERSION;   // html / manifest / offline / icons
 const STATIC_CACHE = 'mylo-static-' + VERSION;   // vendor css, fonts
 const IMAGE_CACHE  = 'mylo-images-' + VERSION;   // artwork & favicons

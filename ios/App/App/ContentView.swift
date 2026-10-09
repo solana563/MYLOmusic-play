@@ -441,7 +441,7 @@ struct ContentView: View {
             Image("MyloWordmark")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 112, height: 42)
+                .frame(width: 140, height: 52)
                 .accessibilityLabel("MYLO")
             Text(value)
                 .font(.largeTitle.bold())

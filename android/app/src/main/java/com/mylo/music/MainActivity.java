@@ -135,7 +135,7 @@ public class MainActivity extends Activity {
         brand.setImageResource(R.drawable.mylo_wordmark);
         brand.setAdjustViewBounds(true);
         brand.setContentDescription("MYLO");
-        root.addView(brand, new LinearLayout.LayoutParams(dp(160), dp(60)));
+        root.addView(brand, new LinearLayout.LayoutParams(dp(200), dp(72)));
         TextView subtitle = text("RADIO  ·  YOUR MUSIC", 11, 0xffaaa3b5, true);
         root.addView(subtitle);
 
