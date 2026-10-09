@@ -1,4 +1,4 @@
-# MYLO
+# (milo.)
 
 **Radio · Video · Your Music** — one local-first player that unifies worldwide
 internet radio, YouTube and your own local audio files.

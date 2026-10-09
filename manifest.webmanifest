@@ -1,7 +1,7 @@
 {
   "id": "/?tab=home",
-  "name": "MYLO — Radio · Video · Your Music",
-  "short_name": "MYLO",
+  "name": "(milo.) — Radio · Video · Your Music",
+  "short_name": "(milo.)",
   "description": "Worldwide internet radio, YouTube and your own local audio files in one local-first player with gapless playback and synced lyrics.",
   "start_url": "./index.html?tab=home",
   "scope": "./",

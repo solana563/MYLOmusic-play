@@ -129,7 +129,7 @@ if signing is not configured. Set release versions with Gradle properties
 ### Play Console
 | Field | Value |
 |---|---|
-| App name | MYLO — Radio · Your Music |
+| App name | (milo.) — Radio · Your Music |
 | Package | `com.mylo.music` |
 | Category | Music & Audio |
 | Content rating | complete the questionnaire (third-party content, user-selected) |
