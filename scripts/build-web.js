@@ -58,13 +58,35 @@ async function copyStaticFiles() {
 async function makeIcons() {
   const source = path.join(root, 'assets/icons/logo-mark.svg');
   const icons = path.join(output, 'assets/icons');
+  const background = { r: 12, g: 10, b: 18, alpha: 1 };
+  async function renderIcon(size, destination) {
+    await sharp(source)
+      .resize(size, size, { fit: 'contain' })
+      .flatten({ background })
+      .png()
+      .toFile(destination);
+  }
+
   await Promise.all([
     ['icon-192.png', 192],
     ['icon-512.png', 512],
     ['icon-maskable-512.png', 512]
-  ].map(([name, size]) =>
-    sharp(source).resize(size, size, { fit: 'contain' }).png().toFile(path.join(icons, name))
-  ));
+  ].map(([name, size]) => renderIcon(size, path.join(icons, name))));
+
+  const androidIcons = [
+    ['mipmap-mdpi', 48],
+    ['mipmap-hdpi', 72],
+    ['mipmap-xhdpi', 96],
+    ['mipmap-xxhdpi', 144],
+    ['mipmap-xxxhdpi', 192]
+  ];
+  const androidRoot = path.join(root, 'android/app/src/main/res');
+  const iosIcon = path.join(root, 'ios/App/App/Assets.xcassets/AppIcon.appiconset/icon.png');
+  await Promise.all([
+    ...androidIcons.map(([directory, size]) =>
+      renderIcon(size, path.join(androidRoot, directory, 'ic_launcher.png'))),
+    renderIcon(1024, iosIcon)
+  ]);
 }
 
 async function writeRuntimeConfig() {
