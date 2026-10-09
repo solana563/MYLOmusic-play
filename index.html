@@ -105,7 +105,7 @@ header{display:flex;align-items:center;gap:12px;padding:calc(18px + env(safe-are
 html.native header{padding-top:calc(12px + env(safe-area-inset-top))}
 .brandwrap{display:flex;align-items:center;gap:12px}
 /* the wordmark replaces the old square mark + separate text label */
-.logo{display:grid;place-items:center;background:transparent;border:0;box-shadow:none;flex-shrink:0;width:clamp(120px,38vw,144px)}
+.logo{display:grid;place-items:center;background:transparent;border:0;box-shadow:none;flex-shrink:0;width:clamp(184px,56vw,220px)}
 .logo svg{width:100%;height:auto;display:block}
 /* sidebar & onboarding get larger lockups */
 #sidebar .logo{width:196px}
@@ -1024,7 +1024,7 @@ function logoDataUrl(bg){return 'data:image/svg+xml;utf8,'+encodeURIComponent(lo
    Doing it here (instead of duplicating the path data in markup) keeps a
    single source of truth for the logo geometry. */
 function paintLogos(){
- [['#headerLogo',144],['#sidebarLogo',196],['#obLogo',220]].forEach(function(pair){
+ [['#headerLogo',220],['#sidebarLogo',220],['#obLogo',220]].forEach(function(pair){
   var el=$(pair[0]);if(!el)return;
   el.innerHTML=logoMarkSvg('#ffffff',1,'width:100%;max-width:'+pair[1]+'px');
  });
