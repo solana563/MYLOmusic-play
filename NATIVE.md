@@ -1,79 +1,55 @@
-# MYLO — Native Build (Capacitor)
+# MYLO native mobile apps
 
-MYLO ships as a single `index.html` **and** a real installable native app for
-Android + iOS via [Capacitor](https://capacitorjs.com). The web app already
-detects the native runtime (`window.Capacitor.isNativePlatform()`) and wires up
-status bar, splash screen, hardware back button and `mylo://` deep links at
-runtime — see `initNative()` in `index.html`.
+The mobile apps are platform-native and do not use a WebView, HTML, or the
+Capacitor runtime. The existing `index.html` remains the separate web/PWA app.
 
-## One-time setup
+## Native feature scope
 
-```bash
-npm install
-npm run add:android      # creates the native Android project
-npm run add:ios          # creates the native iOS project (macOS + Xcode)
-```
+The initial native apps provide:
 
-`prepare:web` copies `index.html` (and `sw.js`) into `www/`, which is Capacitor's
-`webDir`. Re-run `npm run sync` after any change to the HTML.
+- Native listen, radio, library, and playlist screens.
+- Audio-file import using Android's Storage Access Framework and iOS's document
+  importer.
+- On-device library and playlist persistence.
+- Local-file playback and live radio playback using native media players.
+- Radio Browser station discovery by two-letter country code.
+- The supplied horizontal wordmark in the app header and standalone mark for
+  native launcher icons.
 
-## Branded icons & splash (adaptive layers)
+Native video, lyrics, authentication, crossfade, and the web app's other
+advanced player features are not included in this native release.
 
-Drop a 1024×1024 `resources/icon.png` and `resources/splash.png`, then:
+## Android
 
-```bash
-npm run icons
-```
-
-`@capacitor/assets` generates proper Android **adaptive-icon** foreground/background
-layers, round icons, and iOS icon sets + splash screens — all on the `#0c0a12`
-brand background with the red/violet MYLO mark.
-
-## Deep links (OAuth + magic link)
-
-`capacitor.config.json` registers the `mylo` URL scheme. Google OAuth and
-Supabase magic links redirect to **`mylo://auth-callback`**; the native shell
-catches it via the `appUrlOpen` listener and completes the session **without
-navigating the WebView away**, then returns to the app. On the web build the same
-flow falls back to a plain same-origin redirect.
-
-Android also needs an intent filter (added automatically by `npm run add:android`,
-or add manually to `AndroidManifest.xml`):
-
-```xml
-<intent-filter>
-  <action android:name="android.intent.action.VIEW"/>
-  <category android:name="android.intent.category.DEFAULT"/>
-  <category android:name="android.intent.category.BROWSABLE"/>
-  <data android:scheme="mylo" android:host="auth-callback"/>
-</intent-filter>
-```
-
-## Run on a device
+Open `android/` in Android Studio, or build from the repository root:
 
 ```bash
-npm run run:android
-npm run run:ios
+npm run build:android:debug
+npm run build:android
+npm run build:android:bundle
 ```
 
-## What's native vs. what stays web
+An Android SDK and JDK 17 are required; the committed Gradle wrapper downloads
+the pinned Gradle version. Android's document picker grants access only to
+audio files the user selects; MYLO does not request broad media-library
+permission. Internet access is used for station discovery and streams. Radio
+streams must use HTTPS.
 
-| Subsystem | Native integration |
-|---|---|
-| Status bar | Colour + icon style follow the current song's album art (`nativeStatusBar`) |
-| Back button | Closes sheets → returns to Home → exits app |
-| Splash screen | Branded, auto-hidden once the UI paints |
-| Deep links | `mylo://auth-callback` for OAuth / magic link |
-| Keyboard | Native resize mode |
-| Audio, IndexedDB library, Web Audio graph, Media Session | Run inside the WebView exactly as on web |
+The resulting debug APK is at `android/app/build/outputs/apk/debug/`. Configure
+release signing in Android Studio before publishing a release.
 
-> A ground-up Kotlin/Swift rewrite would reimplement every subsystem against
-> native APIs. The Capacitor wrapper gives native packaging, install, icons,
-> splash and back-button behaviour **without** that rewrite.
+## iOS
 
-## PWA (web install)
+On macOS with Xcode, open `ios/App/App.xcodeproj`, select the `MYLO` scheme, and
+run or archive the app. The project targets iOS 16 and later.
 
-`sw.js` must be served next to `index.html` for Chrome's desktop install prompt
-and offline app-shell caching. Service workers cannot be inlined into a single
-HTML file — a real browser restriction — so it's a separate, opt-in file that is
-silently skipped if absent.
+Audio imports are copied into the app's Documents directory. The app declares
+the audio background mode for playback. Set a valid development team and
+bundle-signing settings in Xcode before running on a physical device or
+archiving for the App Store.
+
+## Web / PWA
+
+Serve the repository root over HTTPS (or localhost) to run the independent web
+app. Its HTML-based feature set and PWA/service-worker behavior are unchanged by
+the native mobile implementation.

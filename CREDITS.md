@@ -26,7 +26,7 @@ terms; **review them before publishing commercially.**
 | [Supabase](https://supabase.com/) | **Authentication only** — email/password, magic link, Google OAuth. No user content is stored server-side. |
 | [Google Fonts](https://fonts.google.com/) | Inter typeface |
 | [Font Awesome](https://fontawesome.com/) | Icons (free tier, CC BY 4.0 + SIL OFL 1.1) |
-| [Capacitor](https://capacitorjs.com/) | Native Android + iOS packaging (MIT) |
+| Android SDK / SwiftUI / AVFoundation | Native Android and iOS UI, file import, and audio playback |
 
 ## YouTube API Services — publisher obligations
 
@@ -47,10 +47,11 @@ At minimum:
 
 ## Supabase — publisher obligations
 
-Set the Supabase **Site URL** and **Redirect URLs** to your production origin,
-plus the `mylo://auth-callback` deep link used by the Capacitor shell
-(Authentication → URL Configuration). Keep **Row Level Security enabled** on
-every table. MYLO stores no rows, so RLS can deny everything by default.
+Set the Supabase **Site URL** and **Redirect URLs** to your production origin
+(Authentication → URL Configuration). Supabase is used by the web/PWA only;
+native apps do not currently include sign-in. Keep **Row Level Security
+enabled** on every table. MYLO stores no rows, so RLS can deny everything by
+default.
 
 Enable the Google provider under Authentication → Providers, and paste the
 Google OAuth client ID/secret from the same Cloud project whose key you
@@ -60,7 +61,8 @@ restricted above.
 
 - **Inter** — SIL Open Font License 1.1 (Google Fonts).
 - **Font Awesome Free** — icons CC BY 4.0, fonts SIL OFL 1.1, code MIT.
-- **MYLO wordmark** — © MYLO. Supplied as `assets/icons/logo.svg`.
+- **MYLO logos** — © MYLO. The wordmark and standalone mark are supplied as
+  `assets/icons/logo.svg` and `assets/icons/logo-mark.svg`.
 
 ## Rate-limit etiquette
 

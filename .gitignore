@@ -26,6 +26,8 @@ ios/App/*.xcodeproj/xcuserdata/
 # ---- node ----
 node_modules/
 npm-debug.log*
+dist/
+public/
 
 # ---- OS / editor ----
 .DS_Store

@@ -7,7 +7,7 @@
    ========================================================================== */
 
 /* Bump this on every release — it is what evicts the previous cache. */
-const VERSION      = 'v1.0.1';
+const VERSION      = 'v1.0.6';
 const SHELL_CACHE  = 'mylo-shell-'  + VERSION;   // html / manifest / offline / icons
 const STATIC_CACHE = 'mylo-static-' + VERSION;   // vendor css, fonts
 const IMAGE_CACHE  = 'mylo-images-' + VERSION;   // artwork & favicons
@@ -22,6 +22,7 @@ const SHELL = [
   './manifest.webmanifest',
   './offline.html',
   './assets/icons/logo.svg',
+  './assets/icons/logo-mark.svg',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   './assets/icons/icon-maskable-512.png',
@@ -77,6 +78,10 @@ self.addEventListener('fetch', event => {
 
   // http(s) only (blob:, data:, chrome-extension: pass straight through)
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+
+  // Deploy configuration changes independently of the app shell cache.
+  if (url.origin === self.location.origin &&
+      url.pathname === new URL('runtime-config.js', self.registration.scope).pathname) return;
 
   // 1. Never touch ranged requests. Audio seeking/streaming breaks badly
   //    if a SW answers a 206 with a cached full body.

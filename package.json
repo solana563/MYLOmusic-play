@@ -4,14 +4,11 @@
   "description": "MYLO — Internet Radio, YouTube, and Local Music Super-App",
   "main": "index.html",
   "scripts": {
-    "build": "echo 'Building web assets...'",
-    "cap:sync": "cap sync",
-    "cap:open:android": "cap open android",
-    "cap:open:ios": "cap open ios",
-    "cap:run:android": "cap run android",
-    "cap:run:ios": "cap run ios",
-    "build:android": "cap sync android && cd android && ./gradlew assembleRelease",
-    "build:android:bundle": "cap sync android && cd android && ./gradlew bundleRelease"
+    "build": "node scripts/build-web.js",
+    "build:android:debug": "./android/gradlew -p android assembleDebug",
+    "build:android": "./android/gradlew -p android assembleRelease",
+    "build:android:bundle": "./android/gradlew -p android bundleRelease",
+    "open:ios": "open ios/App/App.xcodeproj"
   },
   "keywords": [
     "music",
@@ -20,7 +17,6 @@
     "player",
     "local-first",
     "audio",
-    "capacitor",
     "android",
     "ios"
   ],
@@ -30,7 +26,7 @@
     "@capacitor/android": "^6.0.0",
     "@capacitor/app": "^6.0.0",
     "@capacitor/browser": "^6.0.0",
-    "@capacitor/cli": "^6.0.0",
+    "@capacitor/cli": "^8.4.3",
     "@capacitor/core": "^6.0.0",
     "@capacitor/filesystem": "^6.0.0",
     "@capacitor/haptics": "^6.0.0",
@@ -40,5 +36,8 @@
     "@capacitor/status-bar": "^6.0.0",
     "@supabase/supabase-js": "^2.43.0",
     "jsmediatags": "^3.9.5"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.5"
   }
 }

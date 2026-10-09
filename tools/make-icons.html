@@ -28,18 +28,18 @@
 <body>
 <div class="w">
   <h1>MYLO — icon generator</h1>
-  <p>Renders the official wordmark to <strong>real PNG files</strong> for the PWA manifest and native shells.
+  <p>Renders the standalone logo to <strong>real PNG files</strong> for the PWA manifest and app icons.
      Canvas rasterising (not SVG) because Chrome's installability check rejects SVG manifest icons.</p>
 
-  <div class="note">Run this page over <code>http(s)</code> (or open the file directly — no server needed) and use the
+  <div class="note">Serve this page over <code>http(s)</code> from the repository root so the logo can be safely rasterized, then use the
     download buttons. Commit the results into <code>assets/icons/</code>.</div>
 
-  <h2>Required files</h2>
+  <h2>App icon files</h2>
   <ul>
     <li><code>assets/icons/icon-192.png</code> — 192×192, <code>purpose: any</code></li>
     <li><code>assets/icons/icon-512.png</code> — 512×512, <code>purpose: any</code></li>
     <li><code>assets/icons/icon-maskable-512.png</code> — 512×512, <code>purpose: maskable</code> (60% inset so Android's circle crop is safe)</li>
-    <li><code>resources/icon.png</code> — 1024×1024 source for <code>@capacitor/assets</code> (adaptive layers + splash)</li>
+    <li><code>icon-1024.png</code> — 1024×1024 high-resolution standalone mark</li>
   </ul>
 
   <h2>Preview &amp; download</h2>
@@ -49,17 +49,13 @@
   <pre># PWA / web
 npx serve .            # verify the manifest in DevTools → Application
 
-# Native icons + splash from the 1024px source
-npm run assets
-npm run sync</pre>
+# Use the downloaded PNGs in app-store icon asset catalogs
+</pre>
 </div>
 
 <script>
-/* ---- official wordmark geometry (keep in sync with index.html) ---- */
-var LOGO_VB='-40 303 638 274';
-var LOGO_W=638, LOGO_H=274;
-var LOGO_D1='M10,353 H133 L153,438 L174,353 H347 L360,423 L373,353 H467 V435 H429 L428,360 L390,476 H335 L350,457 H319 L289,361 V526 H200 L199,433 L176,526 H117 L96,436 L94,526 H10 Z';
-var LOGO_D2='M466,378 C470,362 490,354 512,354 C538,354 556,366 556,388 C556,410 540,422 516,422 C492,422 470,415 466,398 Z M501.0,374.0 Q501.0,370.5 504.0,372.0 L529.0,386.3 Q532.0,388.0 529.0,389.7 L504.0,403.8 Q501.0,405.5 501.0,402.0 Z';
+var logoImage=new Image();
+logoImage.src='../assets/icons/logo-mark.svg';
 
 function render(size,mask,radiusPct){
   var c=document.createElement('canvas');
@@ -75,14 +71,16 @@ function render(size,mask,radiusPct){
     x.fill();
   }
   var inset=mask?0.60:0.74;
-  var scale=(size*inset)/LOGO_W;
-  var w=LOGO_W*scale,h=LOGO_H*scale;
+  var w=size*inset,h=w;
   x.save();
-  x.translate((size-w)/2+40*scale,(size-h)/2-303*scale);
-  x.scale(scale,scale);
-  x.fillStyle='#ffffff';
-  x.fill(new Path2D(LOGO_D1));
-  x.fill(new Path2D(LOGO_D2),'evenodd');   /* play-triangle cut-out */
+  if(!mask){
+    var r=size*(radiusPct==null?0.22:radiusPct);
+    x.beginPath();
+    if(x.roundRect)x.roundRect(0,0,size,size,r);
+    else{x.moveTo(r,0);x.arcTo(size,0,size,size,r);x.arcTo(size,size,0,size,r);x.arcTo(0,size,0,0,r);x.arcTo(0,0,size,0,r);x.closePath()}
+    x.clip();
+  }
+  x.drawImage(logoImage,(size-w)/2,(size-h)/2,w,h);
   x.restore();
   return c;
 }
@@ -95,6 +93,7 @@ var JOBS=[
 ];
 
 var grid=document.getElementById('grid');
+function renderPreviews(){
 JOBS.forEach(function(job){
   var cell=document.createElement('div');
   cell.className='cell';
@@ -118,6 +117,9 @@ JOBS.forEach(function(job){
   cell.appendChild(holder);cell.appendChild(label);cell.appendChild(btn);
   grid.appendChild(cell);
 });
+}
+logoImage.onload=renderPreviews;
+logoImage.onerror=function(){grid.textContent='The logo SVG could not be loaded.'};
 
 /* Download them all in one go (some browsers will ask permission). */
 var all=document.createElement('button');

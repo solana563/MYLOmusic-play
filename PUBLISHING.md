@@ -12,63 +12,43 @@ Keep these three in sync or the service worker will serve a stale shell:
 | Where | What |
 |---|---|
 | `index.html` → `APP = { VERSION, BUILD }` | shown in onboarding + profile |
-| `sw.js` → `const VERSION = 'v1.0.1'` | **bumping this evicts the old cache** |
+| `sw.js` → `const VERSION` | **bumping this evicts the old cache** |
 | `android/app/build.gradle` → `versionCode` / `versionName` | Play Store |
 | `ios/App/App/Info.plist` → `CFBundleVersion` / `CFBundleShortVersionString` | App Store |
 
 ---
 
-## 1 · Deploy files
+## 1 · Build and deploy the web app
 
-Upload **all of these** to the deploy root (they are all in this repo):
+Run `npm ci` followed by `npm run build`. The build creates a complete static
+deploy root in `public/`, including PNG app icons generated from the standalone
+SVG logo and a `runtime-config.js` file generated from public-client
+environment variables. Do not publish the repository root directly.
 
-```
-index.html                  the entire app
-sw.js                       offline shell + background notifications
-manifest.webmanifest        PWA manifest (static, not JS-generated)
-offline.html                shown when a navigation fails offline
-404.html                    not-found page
-robots.txt  sitemap.xml     SEO
-_headers                    Netlify / Cloudflare headers  ─┐ pick the one for
-vercel.json                 Vercel headers                 ─┘ your host
-PRIVACY.html                required by both app stores
-CREDITS.md                  service attribution (keep public too)
-tools/make-icons.html       internal tool — safe to exclude from the deploy
-assets/icons/logo.svg       wordmark
-assets/icons/icon-192.png   ← generate these first, see §2
-assets/icons/icon-512.png
-assets/icons/icon-maskable-512.png
-```
+Vercel reads the build command, `public` output directory and response headers from
+`vercel.json`. Import the repository with the project root set to the
+repository root. Netlify uses `netlify.toml`; other static hosts can publish
+`public/` and apply the response headers in the included `_headers` file.
 
-Update the placeholder domain `https://mylo.app` in `robots.txt`, `sitemap.xml`
-and the social-preview tags in `index.html` to your real origin.
+Set these Vercel build environment variables as applicable:
 
----
+- `MYLO_SUPABASE_URL` and `MYLO_SUPABASE_ANON_KEY` together to enable auth.
+- `MYLO_YOUTUBE_API_KEY` to enable YouTube search and trending.
+- `MYLO_SITE_URL` to set the canonical HTTPS site origin for sitemap and social
+  preview metadata. When omitted, the Vercel or Netlify deployment URL is used
+  when provided by that platform.
 
-## 2 · Generate the real icons (do not skip)
+These browser-delivered values are public. Use only a Supabase
+anon/publishable key (never a service-role key), and restrict the YouTube API
+key to the required API and HTTPS referrers. Configure the final site and
+callback URLs in Supabase before enabling sign-in.
 
-Open **`tools/make-icons.html`** in a browser and download the four PNGs it
-renders. They are rasterised from the official wordmark via canvas, because
-Chrome's installability check rejects SVG manifest icons.
-
-Place them:
-
-```
-assets/icons/icon-192.png            192×192   any
-assets/icons/icon-512.png            512×512   any
-assets/icons/icon-maskable-512.png   512×512   maskable (60% inset)
-resources/icon.png                   1024×1024 native source
-```
-
-> If the PNGs are missing, MYLO silently falls back to generating them at
-> runtime — so nothing breaks, but install prompts get flakier. Ship the files.
-
----
-
-## 3 · Web / PWA
+## 2 · Web / PWA
 
 ```bash
-npx serve .          # or any static host
+npm ci
+npm run build
+npx serve public     # or publish public/ to a static host
 ```
 
 Verify in DevTools → **Application**:
@@ -85,32 +65,28 @@ plain HTTP. `localhost` is exempt for testing.
 
 ---
 
-## 4 · Configure the backends
+## 3 · Configure the backends
 
-### Supabase (auth only)
+### Supabase (web/PWA auth only)
 Authentication → **URL Configuration**:
 - Site URL: `https://your-domain`
-- Redirect URLs: `https://your-domain/**` **and** `mylo://auth-callback`
+- Redirect URLs: `https://your-domain/**`
 - Providers → enable Google (paste the OAuth client ID/secret)
 
-Row Level Security: **on** for every table. MYLO stores no server rows.
+Native mobile builds do not include authentication. Row Level Security should
+remain **on** for every table.
 
-### Google Cloud (YouTube)
+### Google Cloud (YouTube, web/PWA only)
 APIs & Services → Credentials → restrict the YouTube Data API v3 key:
-- Android: package `app.mylo.music` + SHA-1 of your signing cert
-- iOS: bundle ID `app.mylo.music`
 - Web: HTTP referrer `https://your-domain/*`
 
 ---
 
-## 5 · Android (Google Play)
+## 4 · Android (Google Play)
 
 ```bash
-npm install
-npm run add:android        # scaffolds Gradle around the committed sources
-npm run assets             # adaptive icons + splash screens
-npm run sync
-npm run build:android:aab  # → android/app/build/outputs/bundle/release
+npm run build:android:debug # Android SDK required; Gradle wrapper is included
+npm run build:android:bundle # → android/app/build/outputs/bundle/release
 ```
 
 ### Release signing (once)
@@ -126,69 +102,60 @@ Add `android/keystore.properties` (git-ignored), reference it from
 ### Play Console
 | Field | Value |
 |---|---|
-| App name | MYLO — Radio · Video · Your Music |
-| Package | `app.mylo.music` |
+| App name | MYLO — Radio · Your Music |
+| Package | `com.mylo.music` |
 | Category | Music & Audio |
 | Content rating | complete the questionnaire (third-party content, user-selected) |
-| Data safety | Collects **no** data. Email (if provided) is processed by Supabase for auth only. |
+| Data safety | Review the final build and store disclosures before release. |
 | Privacy policy URL | your hosted `PRIVACY.html` |
-| Permissions declared | Internet, network state, `READ_MEDIA_AUDIO` (import own files), foreground service media playback |
+| Permissions declared | Internet. Audio is selected through Android's document picker. |
 | Upload | the `.aab`, then complete the internal → closed → production track |
 
 ---
 
-## 6 · iOS (App Store)
+## 5 · iOS (App Store)
 
 ```bash
-npm run add:ios
-npm run assets
-npm run sync
-npm run build:ios          # opens Xcode → Product ▸ Archive
+open ios/App/App.xcodeproj
 ```
 
-- Signing: your Team, automatic signing, a unique bundle ID.
-- `Info.plist` already declares: background **audio** mode, `UIBackgroundModes`,
-  the `mylo://` URL scheme, `ITSAppUsesNonExemptEncryption = false`, and
-  purpose strings for media-library access.
-- App Privacy: "Data Not Collected" except **Email Address → App Functionality**
-  (auth). Mark it **not used for tracking**.
-- Age rating: 12+ (unrestricted web/video content supplied by third parties).
+- Select the `MYLO` scheme and configure your Team and signing settings in Xcode.
+- The target bundle ID is `com.mylo.music`; change it if your store listing uses
+  a different identifier.
+- The app declares background **audio** mode and imports user-selected audio
+  through the document picker; it does not request full Apple Music library
+  access.
 - Add the same privacy policy URL.
 
 ### Screenshots to capture
 | Size | Where |
 |---|---|
-| 6.7" iPhone (1290×2796) | Listen Now, Now Playing, Lyrics |
-| 6.5" iPhone (1242×2688) | Radio, Library |
-| 12.9" iPad (2048×2732) | Library grid, Now Playing (landscape) |
-| 7" / 10" Android | Radio, Videos, Lyrics |
+| iPhone and Android phone | Listen, Radio, Library, Playlists |
+| iPad and Android tablet | Radio, Library, Playlists |
 
 ---
 
-## 7 · Pre-flight smoke test
+## 6 · Pre-flight smoke test
 
-Run through this on a **real device**, not just a desktop viewport:
+Run through these checks on **real devices**:
 
-- [ ] Onboarding: sign in, sign up, magic link, Google, **and guest**
-- [ ] Sign out of a gated feature → Radio/Lyrics re-lock correctly
-- [ ] Gapless: play an album and confirm no gap between tracks
-- [ ] Crossfade on 3s / 5s / 8s, then skip mid-fade → no double-advance, no silence
-- [ ] Waveform scrub while playing audio **and** while playing video
-- [ ] Lyrics: synced highlight tracks the audio; tap a line → seeks; change track → re-resolves
-- [ ] Radio: country detection, genre chips, bookmark to Library → Stations
-- [ ] Library: import files, edit metadata, re-fetch artwork, delete
-- [ ] Playlists: mix a local track and a video, play each sub-queue
-- [ ] Background the app mid-song → audio continues, lock-screen controls work
-- [ ] Lock the phone → notification shows the right art/title, next/prev work
-- [ ] Rotate to landscape → Now Playing switches to side-by-side art + controls
-- [ ] Airplane mode → offline shell loads, local files play, radio degrades gracefully
+- [ ] Android and iOS launch into native screens with no WebView.
+- [ ] Import one and multiple audio files; imported files remain available after restart.
+- [ ] Play imported audio and pause/resume it.
+- [ ] Load country radio stations, play a secure HTTPS stream, and handle offline/network errors.
+- [ ] Create playlists, add library tracks, and verify membership after restart.
+- [ ] Web/PWA: verify the shell loads offline and local files remain playable.
 
 ---
 
-## 8 · Known, honest limitations
+## 7 · Known, honest limitations
 
 These are real browser/platform restrictions, not unfinished work:
 
+- **Native feature scope:** video, lyrics, authentication, crossfade, and advanced
+  player controls remain available only in the web/PWA app.
+- **Radio:** native playback supports HTTPS streams; stations offering only
+  insecure HTTP streams cannot be played in the native apps.
 - **Single-file inline CSS/JS** means the CSP needs `'unsafe-inline'`. Split the
   bundle if your security review demands nonces.
 - **YouTube video** has no visualizer and no Media Session integration — the

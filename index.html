@@ -28,9 +28,10 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
 <link rel="mask-icon" href="assets/icons/logo.svg" color="#e60023">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Crect width='1024' height='1024' rx='220' fill='%23000000'/%3E%3Csvg x='133' y='362' width='758' height='300' viewBox='-40 303 638 274' fill='%23ffffff'%3E%3Cpath d='M10,353 H133 L153,438 L174,353 H347 L360,423 L373,353 H467 V435 H429 L428,360 L390,476 H335 L350,457 H319 L289,361 V526 H200 L199,433 L176,526 H117 L96,436 L94,526 H10 Z'/%3E%3Cpath fill-rule='evenodd' d='M466,378 C470,362 490,354 512,354 C538,354 556,366 556,388 C556,410 540,422 516,422 C492,422 470,415 466,398 Z M501.0,374.0 Q501.0,370.5 504.0,372.0 L529.0,386.3 Q532.0,388.0 529.0,389.7 L504.0,403.8 Q501.0,405.5 501.0,402.0 Z'/%3E%3C/svg%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="assets/icons/logo-mark.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="runtime-config.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -656,6 +657,36 @@ button:focus-visible{outline:2px solid var(--vio);outline-offset:2px}
  .np-info-ctrls{display:none}
  .npinfo{flex:1;max-width:440px;display:flex;flex-direction:column;justify-content:center}
 }
+/* Video Now Playing uses the player's native 16:9 frame instead of album-art sizing. */
+#npSheet[data-source="video"] .npwrap{padding-right:18px;padding-bottom:max(14px,env(safe-area-inset-bottom));padding-left:18px}
+#npSheet[data-source="video"] .npmid{gap:12px;padding:8px 0}
+#npSheet[data-source="video"] .np-media-col{width:min(100%,720px);flex-shrink:1}
+#npSheet[data-source="video"] .np-video{width:100%;max-width:720px;min-height:0;height:auto;aspect-ratio:16/9;border-radius:16px}
+#npSheet[data-source="video"] .np-video>#ytPlayer{position:absolute;inset:0;width:100%;height:100%}
+#npSheet[data-source="video"] #wave{height:38px;margin-top:10px}
+#npSheet[data-source="video"] .viz-caption{margin-top:4px}
+#npSheet[data-source="video"] .times{margin-top:4px}
+#npSheet[data-source="video"] .ctrls{margin-top:8px}
+#npSheet[data-source="video"] .lyrpill{margin-top:8px;padding:9px 20px}
+#npSheet[data-source="video"] .npextra{margin-top:8px;gap:18px}
+@media(orientation:landscape) and (max-height:600px){
+ #npSheet[data-source="video"] .np-media-col{width:min(46vw,400px)}
+ #npSheet[data-source="video"] .npmid{gap:18px;padding:4px 0}
+ #npSheet[data-source="video"] .np-media-ctrls{margin-top:6px}
+ #npSheet[data-source="video"] .npextra{margin-top:6px}
+}
+@media(orientation:landscape) and (min-width:660px) and (max-width:899px) and (min-height:601px){
+ #npSheet[data-source="video"] .np-media-col{width:min(45vw,400px)}
+ #npSheet[data-source="video"] .np-media-ctrls{margin-top:8px}
+}
+@media(min-width:900px){
+ #npSheet[data-source="video"] .npwrap{padding:32px clamp(28px,5vw,72px)}
+ #npSheet[data-source="video"] .npmid{display:flex;flex-direction:column;gap:14px;width:100%;max-width:900px;padding:12px 0}
+ #npSheet[data-source="video"] .np-media-col{width:min(100%,680px);max-width:680px;flex-shrink:0}
+ #npSheet[data-source="video"] .np-video{max-width:680px}
+ #npSheet[data-source="video"] .npinfo{width:min(100%,680px);max-width:680px;min-width:0;flex:0 1 auto}
+ #npSheet[data-source="video"] .np-media-ctrls{margin-top:12px}
+}
 </style>
 </head>
 <body>
@@ -946,11 +977,11 @@ var APP={
   SCHEME:'mylo',
   BUNDLE_ID:'app.mylo.music'
 };
-var CONFIG={
-  SUPABASE_URL: 'https://lwcypxiwkgphuekygrps.supabase.co',
-  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Y3lweGl3a2dwaHVla3lncnBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxMjU3NzEsImV4cCI6MjA5OTcwMTc3MX0.qCLKCluVfjkByX9GqRvxcihVl0Qo8eJOhfkVXN-nqAQ',
-  YOUTUBE_API_KEY: 'AIzaSyAFSMixowk9ptdAnT6ap3aK_gKO9fOmZ0E'
-};
+var CONFIG=Object.assign({
+  SUPABASE_URL:'',
+  SUPABASE_ANON_KEY:'',
+  YOUTUBE_API_KEY:''
+},window.MYLO_CONFIG||{});
 
 /* ================= state ================= */
 var $=function(s){return document.querySelector(s)};
@@ -970,33 +1001,25 @@ var TABS=[['home','Listen Now','fa-house'],['explore','Explore','fa-compass'],['
 function reg(o){REG.push(o);return REG.length-1}
 function esc(s){return String(s==null?'':s).replace(/[<>"'&]/g,function(c){return{'<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','&':'&amp;'}[c]})}
 /* MYLO logo mark — used for artwork placeholders & empty-state illustrations */
-/* ---- official MYLO wordmark -------------------------------------------
-   Source viewBox is "-40 303 638 274" (≈2.33:1). The second path is the
-   "O", a bubble with a play-triangle knocked out via evenodd — so it must
-   stay on its own path element with fill-rule="evenodd".                */
-var LOGO_VB='-40 303 638 274';
-var LOGO_RATIO=638/274;                 /* ≈ 2.328 */
-var LOGO_D1='M10,353 H133 L153,438 L174,353 H347 L360,423 L373,353 H467 V435 H429 L428,360 L390,476 H335 L350,457 H319 L289,361 V526 H200 L199,433 L176,526 H117 L96,436 L94,526 H10 Z';
-var LOGO_D2='M466,378 C470,362 490,354 512,354 C538,354 556,366 556,388 C556,410 540,422 516,422 C492,422 470,415 466,398 Z M501.0,374.0 Q501.0,370.5 504.0,372.0 L529.0,386.3 Q532.0,388.0 529.0,389.7 L504.0,403.8 Q501.0,405.5 501.0,402.0 Z';
-/* Path group with no transform — these paths are already in SVG space. */
-function logoInner(fill,op){return '<g fill="'+(fill||'#ffffff')+'" '+(op!=null?'fill-opacity="'+op+'"':'')+'>'+
- '<path d="'+LOGO_D1+'"/><path fill-rule="evenodd" d="'+LOGO_D2+'"/></g>'}
-/* Inline wide wordmark: sits on the app background with no plate behind it. */
+/* Keep the wide wordmark separate from the square standalone app mark. */
+var LOGO_VB='0 0 1500 560';
+var LOGO_RATIO=1;
+function logoAssetHref(){return new URL('assets/icons/logo.svg',document.baseURI).href}
+function logoMarkHref(){return new URL('assets/icons/logo-mark.svg',document.baseURI).href}
+function logoInner(op){return '<image href="'+logoAssetHref()+'" x="0" y="0" width="1500" height="560" opacity="'+(op==null?1:op)+'"/>'}
 function logoMarkSvg(fill,op,style){return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+LOGO_VB+'" '+
  'preserveAspectRatio="xMidYMid meet" role="img" aria-label="MYLO"'+(style?' style="'+style+'"':'')+'>'+
- logoInner(fill,op)+'</svg>'}
-/* Square asset (favicon / PWA icon / placeholder): dark plate + centred
-   wordmark. A nested <svg> with its own viewBox does the letterboxing. */
+ logoInner(op)+'</svg>'}
+/* Square icon and placeholder use the standalone mark, not the wordmark. */
 function logoPlateSvg(bg,fill,rad,inset){
  bg=bg||'#000000';inset=inset==null?0.78:inset;
  var w=1024*inset,h=Math.round(w/LOGO_RATIO),x=Math.round((1024-w)/2),y=Math.round((1024-h)/2);
  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">'+
   '<rect width="1024" height="1024" rx="'+(rad||0)+'" fill="'+bg+'"/>'+
-  '<svg x="'+x+'" y="'+y+'" width="'+Math.round(w)+'" height="'+h+'" viewBox="'+LOGO_VB+'">'+
-  logoInner(fill,1)+'</svg></svg>'}
-/* missing album cover → MYLO wordmark on the surface colour */
+  '<image href="'+logoMarkHref()+'" x="'+x+'" y="'+y+'" width="'+Math.round(w)+'" height="'+h+'"/></svg>'}
+/* Missing album cover → standalone MYLO mark on the surface colour. */
 function ph(){return 'data:image/svg+xml;utf8,'+encodeURIComponent(logoPlateSvg('#211c2e','rgba(255,255,255,.9)',0,0.72))}
-/* Current wordmark as a data URL (favicon swaps, native shells, shares). */
+/* Standalone mark as a data URL for square icon and share contexts. */
 function logoDataUrl(bg){return 'data:image/svg+xml;utf8,'+encodeURIComponent(logoPlateSvg(bg||'#000000','#ffffff',0,0.78))}
 /* Paint the wordmark into the header, the sidebar and the onboarding card.
    Doing it here (instead of duplicating the path data in markup) keeps a
@@ -3595,34 +3618,9 @@ function buildPWAFallback(){
   var fallbackSvg=function(mask){
    return 'data:image/svg+xml;utf8,'+encodeURIComponent(logoPlateSvg('#000000','#ffffff',0,mask?0.62:0.78));
   };
-  /* Rasterise the wordmark onto a square icon. The wordmark is ~2.33:1, so
-     it is width-limited and centred vertically. maskable icons get extra
-     inset so Android's circle/squircle crop never clips it. */
+  /* The SVG asset is the source of truth for both wordmarks and fallback icons. */
   function icon(sz,mask){
-   var c=document.createElement('canvas');c.width=c.height=sz;
-   var x=c.getContext('2d');
-   x.fillStyle='#000000';
-   if(mask){x.fillRect(0,0,sz,sz)}else{
-    var r=sz*0.22;                                  /* rounded square */
-    x.beginPath();
-    if(x.roundRect)x.roundRect(0,0,sz,sz,r);
-    else{x.moveTo(r,0);x.arcTo(sz,0,sz,sz,r);x.arcTo(sz,sz,0,sz,r);x.arcTo(0,sz,0,0,r);x.arcTo(0,0,sz,0,r);x.closePath()}
-    x.fill();
-   }
-   try{
-    if(!window.Path2D)return fallbackSvg(mask);
-    var p1=new Path2D(LOGO_D1),p2=new Path2D(LOGO_D2);
-    var inset=mask?0.60:0.74;                       /* of the square */
-    var avail=sz*inset,scale=avail/638;             /* width-limited */
-    var w=638*scale,h=274*scale;                    /* rendered extent */
-    x.save();
-    x.translate((sz-w)/2+40*scale,(sz-h)/2-303*scale);
-    x.scale(scale,scale);
-    x.fillStyle='#ffffff';
-    x.fill(p1);x.fill(p2,'evenodd');                /* play-triangle cut-out */
-    x.restore();
-    return c.toDataURL('image/png');
-   }catch(e){return fallbackSvg(mask)}
+   return fallbackSvg(mask);
   }
   var i192=icon(192,false),i512=icon(512,false),im512=icon(512,true);
   var man={
@@ -3630,9 +3628,9 @@ function buildPWAFallback(){
    start_url:location.href.split('?')[0]+'?tab=home',
    background_color:'#0c0a12',theme_color:'#0c0a12',
    icons:[
-    {src:i192,sizes:'192x192',type:'image/png',purpose:'any'},
-    {src:i512,sizes:'512x512',type:'image/png',purpose:'any'},
-    {src:im512,sizes:'512x512',type:'image/png',purpose:'maskable'}
+    {src:i192,sizes:'any',type:'image/svg+xml',purpose:'any'},
+    {src:i512,sizes:'any',type:'image/svg+xml',purpose:'any'},
+    {src:im512,sizes:'any',type:'image/svg+xml',purpose:'maskable'}
    ],
    shortcuts:[
     {name:'Radio',url:location.href.split('?')[0]+'?tab=radio'},

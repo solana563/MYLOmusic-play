@@ -2,8 +2,8 @@
 # Headers themselves live in ./_headers (shared with Cloudflare Pages).
 
 [build]
-  publish = "."
-  command = "echo 'MYLO is a static single-file app — nothing to build.'"
+  publish = "public"
+  command = "npm run build"
 
 [[headers]]
   for = "/sw.js"
@@ -23,9 +23,14 @@
     Content-Type = "application/manifest+json"
 
 [[headers]]
+  for = "/runtime-config.js"
+  [headers.values]
+    Cache-Control = "no-store, max-age=0"
+
+[[headers]]
   for = "/assets/*"
   [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+    Cache-Control = "public, max-age=0, must-revalidate"
 
 # SPA-ish routing: unknown paths fall through to the 404 page, never to the
 # app itself (the app is a single URL with a ?tab= query).
