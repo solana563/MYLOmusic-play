@@ -1,11 +1,310 @@
 import AVFoundation
+import AuthenticationServices
+import Combine
+import CryptoKit
 import Foundation
+import Security
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 private let myloBackground = Color(red: 12 / 255.0, green: 10 / 255.0, blue: 18 / 255.0)
 private let myloSurface = Color(red: 28 / 255.0, green: 24 / 255.0, blue: 37 / 255.0)
 private let myloAccent = Color(red: 230 / 255.0, green: 0, blue: 35 / 255.0)
+private let myloAuthRedirect = "mylo://auth-callback"
+
+@MainActor
+final class SupabaseAuthStore: NSObject, ObservableObject, ASWebAuthenticationPresentationContextProviding {
+    @Published var emailInput = ""
+    @Published var passwordInput = ""
+    @Published private(set) var signedInEmail = ""
+    @Published private(set) var isBusy = false
+    @Published var errorMessage = ""
+
+    private let supabaseURL = Bundle.main.object(forInfoDictionaryKey: "MYLO_SUPABASE_URL") as? String ?? ""
+    private let anonKey = Bundle.main.object(forInfoDictionaryKey: "MYLO_SUPABASE_ANON_KEY") as? String ?? ""
+    private var accessToken = ""
+    private var webSession: ASWebAuthenticationSession?
+
+    var isConfigured: Bool {
+        URLComponents(string: supabaseURL)?.scheme == "https" &&
+            URLComponents(string: supabaseURL)?.host != nil && !anonKey.isEmpty &&
+            !supabaseURL.hasPrefix("$(") && !anonKey.hasPrefix("$(")
+    }
+
+    var isSignedIn: Bool { !signedInEmail.isEmpty }
+
+    func restoreSession() async {
+        guard isConfigured, let refreshToken = secureValue(for: "refresh") else { return }
+        do {
+            let response = try await request("token?grant_type=refresh_token", body: ["refresh_token": refreshToken])
+            try apply(response)
+        } catch {
+            let failure = error as NSError
+            if failure.domain == "MYLOAuth" && [400, 401].contains(failure.code) {
+                removeSecureValue(for: "refresh")
+                errorMessage = "Your saved sign-in expired. Please sign in again."
+            } else {
+                errorMessage = "Could not restore sign-in. Check your connection."
+            }
+        }
+    }
+
+    func signIn() {
+        Task { await authenticate(createAccount: false) }
+    }
+
+    func createAccount() {
+        Task { await authenticate(createAccount: true) }
+    }
+
+    func sendMagicLink() {
+        Task {
+            guard validateEmail() else { return }
+            do {
+                let verifier = try makeVerifier()
+                try saveSecureValue(verifier, for: "verifier")
+                _ = try await request("otp?redirect_to=\(encodedRedirect)",
+                    body: ["email": emailInput.trimmingCharacters(in: .whitespacesAndNewlines),
+                           "create_user": false,
+                           "code_challenge": challenge(verifier),
+                           "code_challenge_method": "s256"])
+                errorMessage = "Check your inbox for the sign-in link."
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func signInWithGoogle() {
+        guard isConfigured else {
+            errorMessage = "Sign-in is not configured for this build."
+            return
+        }
+        do {
+            let verifier = try makeVerifier()
+            try saveSecureValue(verifier, for: "verifier")
+            var components = URLComponents(string: "\(baseURL)/auth/v1/authorize")
+            components?.queryItems = [
+                URLQueryItem(name: "provider", value: "google"),
+                URLQueryItem(name: "redirect_to", value: myloAuthRedirect),
+                URLQueryItem(name: "code_challenge", value: challenge(verifier)),
+                URLQueryItem(name: "code_challenge_method", value: "s256")
+            ]
+            guard let url = components?.url else { throw URLError(.badURL) }
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: "mylo") { [weak self] callback, error in
+                Task { @MainActor in
+                    guard let self else { return }
+                    if let callback {
+                        await self.handleCallback(callback)
+                    } else if let error {
+                        if (error as? ASWebAuthenticationSessionError)?.code != .canceledLogin {
+                            self.errorMessage = error.localizedDescription
+                        }
+                    }
+                }
+            }
+            session.presentationContextProvider = self
+            session.prefersEphemeralWebBrowserSession = false
+            webSession = session
+            if !session.start() { throw URLError(.cannotOpenFile) }
+        } catch {
+            errorMessage = "Could not start Google sign-in: \(error.localizedDescription)"
+        }
+    }
+
+    func handleCallback(_ url: URL) async {
+        guard url.scheme == "mylo", url.host == "auth-callback" else { return }
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        if let description = components?.queryItems?.first(where: { $0.name == "error_description" })?.value {
+            errorMessage = description
+            return
+        }
+        guard let code = components?.queryItems?.first(where: { $0.name == "code" })?.value,
+              let verifier = secureValue(for: "verifier") else {
+            errorMessage = "Sign-in callback was incomplete. Request a new link."
+            return
+        }
+        removeSecureValue(for: "verifier")
+        do {
+            try apply(try await request("token?grant_type=pkce",
+                body: ["auth_code": code, "code_verifier": verifier]))
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func signOut() {
+        let token = accessToken
+        accessToken = ""
+        signedInEmail = ""
+        removeSecureValue(for: "refresh")
+        guard !token.isEmpty else { return }
+        Task {
+            do { _ = try await request("logout", body: [:], bearer: token) }
+            catch { errorMessage = "Signed out on this device; remote sign-out failed." }
+        }
+    }
+
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow) ?? ASPresentationAnchor()
+    }
+
+    private var baseURL: String { supabaseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/")) }
+    private var encodedRedirect: String {
+        myloAuthRedirect.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? myloAuthRedirect
+    }
+
+    private func authenticate(createAccount: Bool) async {
+        guard validateEmail() else { return }
+        guard passwordInput.count >= (createAccount ? 6 : 1) else {
+            errorMessage = createAccount ? "Use at least 6 characters." : "Enter your password."
+            return
+        }
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            let email = emailInput.trimmingCharacters(in: .whitespacesAndNewlines)
+            var body: [String: Any] = ["email": email, "password": passwordInput]
+            let endpoint: String
+            if createAccount {
+                let verifier = try makeVerifier()
+                try saveSecureValue(verifier, for: "verifier")
+                body["data"] = ["username": email.split(separator: "@").first.map(String.init) ?? ""]
+                body["code_challenge"] = challenge(verifier)
+                body["code_challenge_method"] = "s256"
+                endpoint = "signup?redirect_to=\(encodedRedirect)"
+            } else {
+                endpoint = "token?grant_type=password"
+            }
+            let response = try await request(endpoint, body: body)
+            if response["access_token"] == nil {
+                errorMessage = "Account created. Check your email to confirm, then sign in."
+            } else {
+                try apply(response)
+                passwordInput = ""
+                errorMessage = ""
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func validateEmail() -> Bool {
+        guard isConfigured else {
+            errorMessage = "Sign-in is not configured for this build."
+            return false
+        }
+        let email = emailInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard email.range(of: #"^[^@\s]+@[^@\s]+\.[^@\s]+$"#, options: .regularExpression) != nil else {
+            errorMessage = "Enter a valid email address."
+            return false
+        }
+        return true
+    }
+
+    private func request(_ endpoint: String, body: [String: Any], bearer: String? = nil) async throws -> [String: Any] {
+        guard let url = URL(string: "\(baseURL)/auth/v1/\(endpoint)") else { throw URLError(.badURL) }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        if let bearer { request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let payload = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+        guard let httpResponse = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+        let status = httpResponse.statusCode
+        guard (200..<300).contains(status) else {
+            let message = payload["msg"] as? String ?? payload["message"] as? String ??
+                payload["error_description"] as? String ?? "Sign-in failed. Please try again."
+            throw NSError(domain: "MYLOAuth", code: status, userInfo: [NSLocalizedDescriptionKey: message])
+        }
+        return payload
+    }
+
+    private func apply(_ response: [String: Any]) throws {
+        guard let token = response["access_token"] as? String,
+              let account = response["user"] as? [String: Any],
+              let email = account["email"] as? String else {
+            throw NSError(domain: "MYLOAuth", code: 2, userInfo: [NSLocalizedDescriptionKey: "Sign-in returned no session."])
+        }
+        if let refresh = response["refresh_token"] as? String {
+            try saveSecureValue(refresh, for: "refresh")
+        }
+        removeSecureValue(for: "verifier")
+        accessToken = token
+        signedInEmail = email
+        errorMessage = ""
+    }
+
+    private func makeVerifier() throws -> String {
+        var bytes = Data(count: 32)
+        let length = bytes.count
+        let status = bytes.withUnsafeMutableBytes {
+            SecRandomCopyBytes(kSecRandomDefault, length, $0.baseAddress!)
+        }
+        guard status == errSecSuccess else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
+        }
+        return bytes.base64URLEncodedString()
+    }
+
+    private func challenge(_ verifier: String) -> String {
+        Data(SHA256.hash(data: Data(verifier.utf8))).base64URLEncodedString()
+    }
+
+    private func saveSecureValue(_ value: String, for key: String) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.mylo.music.auth",
+            kSecAttrAccount as String: key
+        ]
+        let data = Data(value.utf8)
+        let status = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        if status == errSecItemNotFound {
+            var item = query
+            item[kSecValueData as String] = data
+            item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            let addStatus = SecItemAdd(item as CFDictionary, nil)
+            guard addStatus == errSecSuccess else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(addStatus)) }
+        } else if status != errSecSuccess {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
+        }
+    }
+
+    private func secureValue(for key: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.mylo.music.auth",
+            kSecAttrAccount as String: key,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private func removeSecureValue(for key: String) {
+        SecItemDelete([
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.mylo.music.auth",
+            kSecAttrAccount as String: key
+        ] as CFDictionary)
+    }
+}
+
+private extension Data {
+    func base64URLEncodedString() -> String {
+        base64EncodedString().replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+    }
+}
 
 struct LocalTrack: Identifiable, Codable, Hashable {
     var id: String
@@ -227,6 +526,7 @@ final class MusicStore: ObservableObject {
 @MainActor
 struct ContentView: View {
     @EnvironmentObject private var music: MusicStore
+    @StateObject private var auth = SupabaseAuthStore()
     @State private var selectedTab = "Listen"
     @State private var showingImporter = false
     @State private var showingNewPlaylist = false
@@ -262,7 +562,9 @@ struct ContentView: View {
         .task {
             countryCode = music.country
             await music.loadStations(countryCode: countryCode)
+            await auth.restoreSession()
         }
+        .onOpenURL { url in Task { await auth.handleCallback(url) } }
     }
 
     private var listenView: some View {
@@ -271,6 +573,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     title("Listen now")
                     introCard("Radio · Your music", "A local-first player for live radio, your audio files, and playlists.")
+                    accountCard
                     Button { selectedTab = "Radio" } label: {
                         Label("Browse live radio", systemImage: "dot.radiowaves.left.and.right")
                     }.buttonStyle(PrimaryButtonStyle())
@@ -286,6 +589,49 @@ struct ContentView: View {
             .background(myloBackground)
             .toolbar(.hidden, for: .navigationBar)
         }
+    }
+
+    private var accountCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(auth.isSignedIn ? "Signed in" : "MYLO account").font(.headline)
+            if auth.isSignedIn {
+                Text(auth.signedInEmail).font(.subheadline).foregroundStyle(.secondary)
+                Button("Sign out", action: auth.signOut).buttonStyle(SecondaryButtonStyle())
+            } else {
+                TextField("Email address", text: $auth.emailInput)
+                    .textContentType(.emailAddress)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .padding(12)
+                    .background(myloBackground, in: RoundedRectangle(cornerRadius: 10))
+                SecureField("Password", text: $auth.passwordInput)
+                    .textContentType(.password)
+                    .padding(12)
+                    .background(myloBackground, in: RoundedRectangle(cornerRadius: 10))
+                Button(auth.isBusy ? "Please wait…" : "Sign in", action: auth.signIn)
+                    .buttonStyle(PrimaryButtonStyle()).disabled(auth.isBusy)
+                Button("Create account", action: auth.createAccount)
+                    .buttonStyle(SecondaryButtonStyle()).disabled(auth.isBusy)
+                HStack {
+                    Button("Magic link", action: auth.sendMagicLink)
+                    Spacer()
+                    Button("Continue with Google", action: auth.signInWithGoogle)
+                }
+                .font(.footnote.weight(.semibold))
+                .tint(myloAccent)
+                .disabled(auth.isBusy)
+            }
+            if !auth.errorMessage.isEmpty {
+                Text(auth.errorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(auth.errorMessage.hasPrefix("Check your inbox") ? .green : .red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(myloSurface, in: RoundedRectangle(cornerRadius: 16))
     }
 
     private var radioView: some View {

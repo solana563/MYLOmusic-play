@@ -8,8 +8,8 @@
     "build:android:debug": "./android/gradlew -p android assembleDebug",
     "build:android": "./android/gradlew -p android assembleRelease",
     "build:android:bundle": "./android/gradlew -p android bundleRelease",
-    "build:ios:simulator": "xcodebuild -project ios/App/App.xcodeproj -scheme MYLO -sdk iphonesimulator -configuration Debug -derivedDataPath ios/App/build CODE_SIGNING_ALLOWED=NO build",
-    "archive:ios": "xcodebuild -project ios/App/App.xcodeproj -scheme MYLO -configuration Release -archivePath ios/App/build/MYLO.xcarchive archive",
+    "build:ios:simulator": "xcodebuild -project ios/App/App.xcodeproj -scheme MYLO -sdk iphonesimulator -configuration Debug -derivedDataPath ios/App/build CODE_SIGNING_ALLOWED=NO MYLO_SUPABASE_URL=\"${MYLO_SUPABASE_URL}\" MYLO_SUPABASE_ANON_KEY=\"${MYLO_SUPABASE_ANON_KEY}\" build",
+    "archive:ios": "xcodebuild -project ios/App/App.xcodeproj -scheme MYLO -configuration Release -archivePath ios/App/build/MYLO.xcarchive MYLO_SUPABASE_URL=\"${MYLO_SUPABASE_URL}\" MYLO_SUPABASE_ANON_KEY=\"${MYLO_SUPABASE_ANON_KEY}\" archive",
     "open:ios": "open ios/App/App.xcodeproj"
   },
   "keywords": [

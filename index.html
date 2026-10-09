@@ -3202,6 +3202,7 @@ function globalSearch(q){if(!q)return;$('#gres').innerHTML=skRows(4);
 
 /* ================= auth (Supabase, guest-first) ================= */
 var supa=null,user=null;
+var authRenderer=null,authInitMessage='';
 function initAuth(){
  var box=$('#authBox');if(!box)return;
  function draw(){
@@ -3220,27 +3221,29 @@ function initAuth(){
    '<input id="aPass" class="field auth-input" type="password" placeholder="Password" autocomplete="current-password" style="margin-bottom:10px" onkeydown="if(event.key===\'Enter\'){event.preventDefault();emailAuth(window._authIsSignup?1:0)}">'+
    '<button class="btnw auth-go" id="aSubmit" onclick="emailAuth(window._authIsSignup?1:0)">Sign in</button>'+
    '<div class="auth-alt"><button class="auth-linkbtn" onclick="magicAuth()"><i class="fa-solid fa-wand-magic-sparkles"></i> Magic link</button><button class="auth-linkbtn" onclick="googleAuth()"><i class="fa-brands fa-google"></i> Google</button></div>'+
+   (authInitMessage?'<div class="auth-err show">'+esc(authInitMessage)+'</div>':'')+
    '<div class="auth-err" id="aErr"></div></div>';
   window._authIsSignup=false;
   paintProfile();
  }
+ authRenderer=draw;
+ if(!S.supUrl||!S.supKey)authInitMessage='Sign-in is not configured for this deployment. Set MYLO_SUPABASE_URL and MYLO_SUPABASE_ANON_KEY in the host build settings.';
+ else if(!window.supabase)authInitMessage='Sign-in could not load. Check the connection and reload the app.';
+ if(authInitMessage){draw();return}
  try{
-  if(S.supUrl&&S.supKey&&window.supabase){supa=window.supabase.createClient(S.supUrl,S.supKey);
-   supa.auth.getSession().then(function(r){user=r.data.session?r.data.session.user:null;draw();obAuthResolved()});
-   supa.auth.onAuthStateChange(function(ev,sess){
-    user=sess?sess.user:null;draw();
-    /* A real sign-in (or sign-out) drives the onboarding hand-off. */
+  supa=window.supabase.createClient(S.supUrl,S.supKey);
+  supa.auth.onAuthStateChange(function(ev,sess){
+   /* Run app callbacks after the Supabase auth lock is released. */
+   setTimeout(function(){
+    user=sess?sess.user:null;
+    draw();
     obAuthResolved(ev);
-   });
-  } else draw();
- }catch(e){draw()}
- /* Returning from a magic link / OAuth: Supabase puts tokens in the hash. */
- try{
-  if(location.hash&&location.hash.indexOf('access_token')>=0){
-   toast('Completing sign-in…');
-   obNote('Finishing sign-in…','');
-  }
- }catch(e){}
+   },0);
+  });
+ }catch(e){
+  authInitMessage='Sign-in could not be initialized. Check the Supabase URL and public anon key.';
+  supa=null;draw();
+ }
 }
 
 /* ==========================================================================
@@ -3293,15 +3296,15 @@ function obTogglePw(){
 function obForgot(){
  var e=(($('#obEmail')||{}).value||'').trim();
  if(!e){obFieldError('obEmail');return obNote('Enter your email, then tap Forgot password.','warn')}
- if(!supa)return obNote('Sign-in is unavailable right now.','warn');
+ if(!supa)return obNote(authInitMessage||'Sign-in is unavailable right now.','warn');
  obNote('Sending reset link…');
  supa.auth.resetPasswordForEmail(e,{redirectTo:location.href.split('#')[0]}).then(function(r){
   if(r.error)return obNote(r.error.message,'err');
   obNote('Reset link sent — check your inbox.','ok');
- });
+ }).catch(function(){obNote('Could not send the reset link. Check your connection and try again.','err')});
 }
 function obAuthSubmit(){
- if(!supa){obNote('Can’t reach sign-in. Try guest mode for now.','warn');return}
+ if(!supa){obNote(authInitMessage||'Can’t reach sign-in. Try guest mode for now.','warn');return}
  var em=$('#obEmail'),pw=$('#obPass');
  var e=(em&&em.value||'').trim(),p=(pw&&pw.value||'');
  if(!e){obFieldError('obEmail');return obNote('Enter your email address.','warn')}
@@ -3311,9 +3314,10 @@ function obAuthSubmit(){
  var btn=$('#obSubmit');if(btn){btn.disabled=true;btn.innerHTML='<span class="ob-spinner"></span>Please wait…'}
  obNote('');
  var signupData={username:S.profileName||e.split('@')[0].replace(/[._-]+/g,' '),avatar_preset:S.avatarPreset||'pulse'};
- (obAuthIsSignup?supa.auth.signUp({email:e,password:p,options:{data:signupData}}):supa.auth.signInWithPassword({email:e,password:p}))
+ var signingUp=obAuthIsSignup;
+ (signingUp?supa.auth.signUp({email:e,password:p,options:{data:signupData}}):supa.auth.signInWithPassword({email:e,password:p}))
  .then(function(r){
-  if(btn){btn.disabled=false;btn.textContent=obAuthIsSignup?'Create account':'Sign in'}
+  if(btn){btn.disabled=false;btn.textContent=signingUp?'Create account':'Sign in'}
   if(r.error){
    var m=String(r.error.message||'Sign-in failed');
    if(/invalid login|invalid.*credentials/i.test(m))m='Wrong email or password. Try again.';
@@ -3325,17 +3329,17 @@ function obAuthSubmit(){
   }
   obNote('Signed in — one moment…','ok');
   obAuthResolved('SIGNED_IN');
- }).catch(function(){if(btn){btn.disabled=false;btn.textContent=obAuthIsSignup?'Create account':'Sign in'}obNote('Connection issue — try again.','err')});
+ }).catch(function(){if(btn){btn.disabled=false;btn.textContent=signingUp?'Create account':'Sign in'}obNote('Connection issue — try again.','err')});
 }
 function obMagic(){
- if(!supa)return obNote('Sign-in is unavailable. Try guest mode.','warn');
+ if(!supa)return obNote(authInitMessage||'Sign-in is unavailable. Try guest mode.','warn');
  var e=(($('#obEmail')||{}).value||'').trim();
  if(!e){obFieldError('obEmail');return obNote('Enter your email first.','warn')}
  var redir=isNative?(APP.SCHEME+'://auth-callback'):location.href.split('#')[0];
  obNote('Sending magic link…');
  supa.auth.signInWithOtp({email:e,options:{emailRedirectTo:redir}}).then(function(r){
   obNote(r.error?r.error.message:'Check your inbox for the magic link.','ok');
- });
+ }).catch(function(){obNote('Could not send the magic link. Check your connection and try again.','err')});
 }
 /* Guest mode = local-first, no account. Full feature set minus cross-device sync. */
 function obGuest(){
@@ -3518,14 +3522,8 @@ function obBoot(){
  if(v)v.textContent='v'+APP.VERSION+' ('+APP.BUILD+')';
  obAuthMode(0);
  obShow('welcome');
- /* If Supabase already restored a session, don't make them sign in twice. */
- if(supa){
-  supa.auth.getSession().then(function(r){
-   if(r.data&&r.data.session){obAuthResolved('RESTORED')}
-  }).catch(function(){});
- }
 }
-function needSup(){if(!supa){authErr('Sign-in is unavailable right now.');return false}return true}
+function needSup(){if(!supa){authErr(authInitMessage||'Sign-in is unavailable right now.');return false}return true}
 function authErr(msg,ok){
  var n=$('#aErr');if(!n){if(msg)toast(msg);return}
  if(!msg){n.className='auth-err';n.textContent='';return}
@@ -3560,7 +3558,7 @@ function emailAuth(up){
   }
   if(up&&r.data&&r.data.user&&!r.data.session){authMode(0);return authErr('Account created — check your inbox, then sign in.',true)}
   toast('Signed in — Radio & Lyrics unlocked');
- }).catch(function(){if(btn){btn.disabled=false}authErr('Connection issue — try again.')});
+ }).catch(function(){if(btn){btn.disabled=false;btn.textContent=up?'Create account':'Sign in'}authErr('Connection issue — try again.')});
 }
 function magicAuth(){
  if(!needSup())return;
@@ -3569,7 +3567,7 @@ function magicAuth(){
  supa.auth.signInWithOtp({email:e,options:{emailRedirectTo:location.href.split('#')[0]}}).then(function(r){
   if(r.error)return authErr(r.error.message);
   authErr('Check your inbox for the magic link.',true);
- });
+ }).catch(function(){authErr('Could not send the magic link. Check your connection and try again.')});
 }
 function googleAuth(){if(!needSup())return;
  /* native: open Google in the SYSTEM browser and return via mylo:// deep link — never navigate the app's WebView away */
@@ -3579,16 +3577,17 @@ function googleAuth(){if(!needSup())return;
   if(isNative&&r.data&&r.data.url){var br=plugin('Browser');
    if(br&&br.open){br.open({url:r.data.url});toast('Opening system browser — returns via mylo://')}
    else{window.open(r.data.url,'_system');toast('Continue in browser…')}}
-  else toast('Redirecting to Google…')})}
+  else toast('Redirecting to Google…')}).catch(function(){authErr('Could not start Google sign-in. Check your connection and try again.')})}
 function logout(){
  askConfirm('Sign out','Radio and Lyrics will be locked again. Your library, playlists and likes stay on this device.','Sign out',true,function(ok){
   if(ok!==true)return;
-  obSave({signin:false});
-  if(supa)supa.auth.signOut();
-  user=null;
-  initAuth();
-  refreshMembersUI();
-  toast('Signed out');
+  if(!supa)return authErr('Sign-in is unavailable right now.');
+  supa.auth.signOut().then(function(r){
+   if(r.error)return authErr('Could not sign out: '+r.error.message);
+   user=null;obSave({signin:false});pendingFeature=null;
+   if(authRenderer)authRenderer();
+   refreshMembersUI();toast('Signed out');
+  }).catch(function(){authErr('Could not sign out. Check your connection and try again.')});
  });
 }
 

@@ -16,13 +16,13 @@ main{max-width:760px;margin:auto}a{color:#ff4964}h1{font-size:30px;margin:10px 0
 <a class="back" href="index.html">Back to MYLO</a>
 <h1>Privacy Policy</h1>
 <span class="tag">Effective 2026-01-01</span>
-<div class="box"><p><strong>Short version:</strong> your imported songs and playlists stay on your device. The web/PWA can use Supabase for authentication and username/avatar metadata. The native mobile apps do not include account sign-in.</p></div>
+<div class="box"><p><strong>Short version:</strong> your imported songs and playlists stay on your device. The web/PWA and native apps can use Supabase for authentication and username/avatar metadata. Native refresh tokens are protected by the device's secure storage.</p></div>
 
 <h2>Information stored on your device</h2>
 <p>The web/PWA stores local audio files, parsed metadata, artwork, playlists, liked items, saved stations and preferences in browser storage. Native apps keep playlists on device; iOS copies imported audio into app storage, while Android retains the file-picker references you grant. This local content is not uploaded to MYLO or Supabase.</p>
 
 <h2>Account information</h2>
-<p>If you create an account, Supabase processes your email address and authentication credentials. Your selected <strong>MYLO username</strong> and <strong>abstract avatar preset identifier</strong> are stored in Supabase Auth user metadata so they can follow your account across signed-in devices. No profile photograph is uploaded; avatars are generated inside the app from preset artwork.</p>
+<p>If you create an account, Supabase processes your email address and authentication credentials. The apps support email/password, email magic links, and Google OAuth. A refresh token is stored securely on iOS and Android 6+ to keep you signed in; older Android versions require signing in again after restart. Your selected <strong>MYLO username</strong> and <strong>abstract avatar preset identifier</strong> are stored in Supabase Auth user metadata so they can follow your account across signed-in devices. No profile photograph is uploaded; avatars are generated inside the app from preset artwork.</p>
 
 <h2>Importing audio on mobile</h2>
 <p>Native apps use the operating system's file picker. MYLO can access only the audio files you select. Android retains the file-picker access grant; iOS copies selected files into MYLO's app storage. MYLO does not request broad access to your music library.</p>

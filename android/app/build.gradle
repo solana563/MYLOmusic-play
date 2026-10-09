@@ -13,6 +13,8 @@ def signingValue = { String name ->
 }
 def hasReleaseSigning = ["storeFile", "storePassword", "keyAlias", "keyPassword"]
     .every { signingValue(it) }
+def supabaseUrl = findProperty("MYLO_SUPABASE_URL") ?: System.getenv("MYLO_SUPABASE_URL") ?: ""
+def supabaseAnonKey = findProperty("MYLO_SUPABASE_ANON_KEY") ?: System.getenv("MYLO_SUPABASE_ANON_KEY") ?: ""
 
 android {
     namespace "com.mylo.music"
@@ -24,7 +26,10 @@ android {
         versionCode (findProperty("MYLO_VERSION_CODE") ?: "1").toInteger()
         versionName findProperty("MYLO_VERSION_NAME") ?: "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField "String", "SUPABASE_URL", groovy.json.JsonOutput.toJson(supabaseUrl.toString())
+        buildConfigField "String", "SUPABASE_ANON_KEY", groovy.json.JsonOutput.toJson(supabaseAnonKey.toString())
     }
+    buildFeatures { buildConfig true }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8

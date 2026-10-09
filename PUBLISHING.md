@@ -67,14 +67,30 @@ plain HTTP. `localhost` is exempt for testing.
 
 ## 3 · Configure the backends
 
-### Supabase (web/PWA auth only)
+### Supabase (web/PWA and native auth)
 Authentication → **URL Configuration**:
 - Site URL: `https://your-domain`
-- Redirect URLs: `https://your-domain/**`
+- Redirect URLs: `https://your-domain/**` and `mylo://auth-callback`
 - Providers → enable Google (paste the OAuth client ID/secret)
+- In Google Cloud, register Supabase's displayed callback URL for the Google
+  OAuth client; the app's `mylo://auth-callback` is a Supabase redirect allow
+  list entry, not Google's callback URL.
 
-Native mobile builds do not include authentication. Row Level Security should
-remain **on** for every table.
+Set `MYLO_SUPABASE_URL` and `MYLO_SUPABASE_ANON_KEY` for native builds as well
+as web deployments. Android accepts Gradle properties or environment
+variables; the iOS npm build commands forward these environment variables to
+Xcode. The anon/publishable key is public; never use a service-role key.
+Configure Google's OAuth callback in Supabase's provider settings. Row Level
+Security should remain **on** for every table.
+
+For native builds, export both public values before building:
+
+```bash
+export MYLO_SUPABASE_URL="https://your-project.supabase.co"
+export MYLO_SUPABASE_ANON_KEY="your-anon-or-publishable-key"
+npm run build:android:bundle
+npm run archive:ios
+```
 
 ### Google Cloud (YouTube, web/PWA only)
 APIs & Services → Credentials → restrict the YouTube Data API v3 key:
@@ -173,7 +189,7 @@ the publisher/support-contact placeholder in `PRIVACY.html` before publishing.
 
 These are real browser/platform restrictions, not unfinished work:
 
-- **Native feature scope:** video, lyrics, authentication, crossfade, and advanced
+- **Native feature scope:** video, lyrics, crossfade, and advanced
   player controls remain available only in the web/PWA app.
 - **Radio:** native playback supports HTTPS streams; stations offering only
   insecure HTTP streams cannot be played in the native apps.

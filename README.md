@@ -63,9 +63,10 @@ metadata if `MYLO_SITE_URL` is not set.
 | **Now Playing** | Live waveform scrubber, Web Audio visualizer, adaptive album-art colour, Media Session lock-screen controls |
 | **Auth** | Supabase email/password, magic link, Google OAuth. Radio + Lyrics are members-only; everything else works as a guest. |
 
-The feature list above describes the **web/PWA**. The first native mobile release
-includes local music import and playback, radio streaming, and on-device
-playlists. Native video, lyrics, and sign-in are not included yet.
+The feature list above describes the **web/PWA**. Native apps include local
+music import and playback, radio streaming, on-device playlists, and Supabase
+sign-in. Native video, lyrics, and the web app's advanced player features are
+not included yet.
 
 ---
 

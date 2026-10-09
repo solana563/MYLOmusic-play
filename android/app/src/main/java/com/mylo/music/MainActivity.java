@@ -8,10 +8,12 @@ import android.graphics.Color;
 import android.media.AudioAttributes;
 import android.media.MediaPlayer;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.view.Gravity;
 import android.view.View;
+import android.util.Base64;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -30,10 +32,19 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.KeyStore;
+import java.security.SecureRandom;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_AUDIO = 41;
@@ -53,6 +64,10 @@ public class MainActivity extends Activity {
     private String country = "US";
     private String playingTitle = "";
     private boolean isPlaying;
+    private String authEmail = "";
+    private String authAccessToken = "";
+    private AlertDialog authDialog;
+    private static final String AUTH_KEY_ALIAS = "mylo.auth";
 
     private static final class Track {
         String id;
@@ -76,7 +91,15 @@ public class MainActivity extends Activity {
         getWindow().setNavigationBarColor(BG);
         preferences = getSharedPreferences(PREFS, MODE_PRIVATE);
         loadSavedState();
+        restoreAuthSession();
         render();
+        handleAuthCallback(getIntent() == null ? null : getIntent().getData());
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleAuthCallback(intent == null ? null : intent.getData());
     }
 
     private void loadSavedState() {
@@ -181,6 +204,13 @@ public class MainActivity extends Activity {
     private void showListen() {
         heading("Listen now");
         card("A player for your music and the radio.", "Import audio files, browse live stations, and build playlists that stay on this device.");
+        if (authEmail.isEmpty()) {
+            card("Sign in to MYLO", "Use your MYLO account to sign in with email, a magic link, or Google.");
+            action("Sign in or create an account", this::showAuthDialog);
+        } else {
+            card("Signed in", authEmail);
+            action("Sign out", this::signOut);
+        }
         action("Browse radio", () -> { activeTab = "Radio"; render(); });
         action("Open your library", () -> { activeTab = "Library"; render(); });
         action("Create a playlist", this::createPlaylist);
@@ -188,6 +218,318 @@ public class MainActivity extends Activity {
             heading("Recently added");
             for (Track track : tracks.subList(0, Math.min(4, tracks.size()))) trackRow(track);
         }
+    }
+
+    private interface AuthCallback {
+        void complete(JSONObject response, String error);
+    }
+
+    private boolean authConfigured() {
+        Uri projectUrl = Uri.parse(BuildConfig.SUPABASE_URL);
+        return "https".equals(projectUrl.getScheme()) && projectUrl.getHost() != null
+            && !BuildConfig.SUPABASE_ANON_KEY.isEmpty();
+    }
+
+    private void showAuthDialog() {
+        if (!authConfigured()) {
+            new AlertDialog.Builder(this).setTitle("Sign-in unavailable")
+                .setMessage("This build needs MYLO_SUPABASE_URL and MYLO_SUPABASE_ANON_KEY configured.")
+                .setPositiveButton("OK", null).show();
+            return;
+        }
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(20), dp(8), dp(20), dp(8));
+        EditText email = new EditText(this);
+        email.setSingleLine(true);
+        email.setHint("Email address");
+        email.setInputType(33);
+        form.addView(email, params(-1, dp(52)));
+        EditText password = new EditText(this);
+        password.setSingleLine(true);
+        password.setHint("Password");
+        password.setInputType(129);
+        form.addView(password, params(-1, dp(52)));
+        Button magic = button("Send a magic link", Color.WHITE, false);
+        Button google = button("Continue with Google", Color.WHITE, false);
+        form.addView(magic, params(-1, dp(48)));
+        form.addView(google, params(-1, dp(48)));
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("MYLO account")
+            .setView(form).setNegativeButton("Cancel", null)
+            .setPositiveButton("Sign in", null).setNeutralButton("Create account", null).create();
+        authDialog = dialog;
+        dialog.setOnDismissListener(ignored -> {
+            if (authDialog == dialog) authDialog = null;
+        });
+        dialog.setOnShowListener(ignored -> {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view ->
+                authenticate(email.getText().toString(), password.getText().toString(), false));
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(view ->
+                authenticate(email.getText().toString(), password.getText().toString(), true));
+        });
+        magic.setOnClickListener(view -> sendMagicLink(email.getText().toString()));
+        google.setOnClickListener(view -> startGoogleSignIn());
+        dialog.show();
+    }
+
+    private void authenticate(String emailValue, String password, boolean createAccount) {
+        String email = emailValue.trim();
+        if (!email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+            Toast.makeText(this, "Enter a valid email address.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (password.length() < (createAccount ? 6 : 1)) {
+            Toast.makeText(this, createAccount ? "Use at least 6 characters." : "Enter your password.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        try {
+            JSONObject body = new JSONObject().put("email", email).put("password", password);
+            if (createAccount) {
+                String verifier = createVerifier();
+                saveEncrypted("auth_verifier", verifier);
+                body.put("data", new JSONObject().put("username", email.substring(0, email.indexOf('@'))))
+                    .put("code_challenge", codeChallenge(verifier)).put("code_challenge_method", "s256");
+            }
+            String endpoint = createAccount
+                ? "/signup?redirect_to=" + Uri.encode("mylo://auth-callback")
+                : "/token?grant_type=password";
+            authRequest(endpoint, body, null, (response, error) -> {
+                if (error != null) {
+                    Toast.makeText(this, error, Toast.LENGTH_LONG).show();
+                } else if (!applyAuthSession(response)) {
+                    Toast.makeText(this, "Account created. Check your email to confirm, then sign in.", Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(this, "Signed in as " + authEmail, Toast.LENGTH_LONG).show();
+                }
+            });
+        } catch (Exception error) {
+            Toast.makeText(this, "Could not start sign-in.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void sendMagicLink(String emailValue) {
+        String email = emailValue.trim();
+        if (!email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+            Toast.makeText(this, "Enter a valid email address.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        try {
+            String verifier = createVerifier();
+            saveEncrypted("auth_verifier", verifier);
+            JSONObject body = new JSONObject().put("email", email).put("create_user", false)
+                .put("code_challenge", codeChallenge(verifier)).put("code_challenge_method", "s256");
+            authRequest("/otp?redirect_to=" + Uri.encode("mylo://auth-callback"), body, null,
+                (response, error) -> Toast.makeText(this,
+                    error == null ? "Check your inbox for the sign-in link." : error, Toast.LENGTH_LONG).show());
+        } catch (Exception error) {
+            Toast.makeText(this, "Could not prepare the magic link. Try again.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void startGoogleSignIn() {
+        try {
+            String verifier = createVerifier();
+            saveEncrypted("auth_verifier", verifier);
+            Uri url = Uri.parse(BuildConfig.SUPABASE_URL.replaceAll("/+$", "") + "/auth/v1/authorize")
+                .buildUpon().appendQueryParameter("provider", "google")
+                .appendQueryParameter("redirect_to", "mylo://auth-callback")
+                .appendQueryParameter("code_challenge", codeChallenge(verifier))
+                .appendQueryParameter("code_challenge_method", "s256").build();
+            startActivity(new Intent(Intent.ACTION_VIEW, url));
+        } catch (Exception error) {
+            Toast.makeText(this, "Could not open Google sign-in.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private String createVerifier() {
+        byte[] value = new byte[32];
+        new SecureRandom().nextBytes(value);
+        return Base64.encodeToString(value, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
+    }
+
+    private String codeChallenge(String verifier) throws Exception {
+        byte[] digest = MessageDigest.getInstance("SHA-256").digest(verifier.getBytes("UTF-8"));
+        return Base64.encodeToString(digest, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
+    }
+
+    private void handleAuthCallback(Uri callback) {
+        if (callback == null || !"mylo".equals(callback.getScheme()) || !"auth-callback".equals(callback.getHost())) return;
+        String error = callback.getQueryParameter("error_description");
+        if (error != null) {
+            Toast.makeText(this, error, Toast.LENGTH_LONG).show();
+            return;
+        }
+        String callbackCode = callback.getQueryParameter("code");
+        if (callbackCode == null && callback.getFragment() != null) {
+            Uri fragment = Uri.parse("mylo://auth-callback?" + callback.getFragment());
+            callbackCode = fragment.getQueryParameter("code");
+        }
+        String verifier = readEncrypted("auth_verifier");
+        if (callbackCode == null || verifier == null) {
+            Toast.makeText(this, "Sign-in callback was incomplete. Request a new link.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        preferences.edit().remove("auth_verifier").apply();
+        try {
+            JSONObject body = new JSONObject().put("auth_code", callbackCode).put("code_verifier", verifier);
+            authRequest("/token?grant_type=pkce", body, null, (response, requestError) -> {
+                if (requestError != null) Toast.makeText(this, requestError, Toast.LENGTH_LONG).show();
+                else if (applyAuthSession(response)) Toast.makeText(this, "Signed in as " + authEmail, Toast.LENGTH_LONG).show();
+                else Toast.makeText(this, "Sign-in returned no session.", Toast.LENGTH_LONG).show();
+            });
+        } catch (Exception requestError) {
+            Toast.makeText(this, "Could not complete sign-in.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void authRequest(String endpoint, JSONObject body, String bearer, AuthCallback callback) {
+        network.execute(() -> {
+            HttpURLConnection connection = null;
+            JSONObject response = null;
+            String errorMessage = null;
+            try {
+                URL url = new URL(BuildConfig.SUPABASE_URL.replaceAll("/+$", "") + "/auth/v1" + endpoint);
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("POST");
+                connection.setConnectTimeout(15000);
+                connection.setReadTimeout(15000);
+                connection.setDoOutput(true);
+                connection.setRequestProperty("Content-Type", "application/json");
+                connection.setRequestProperty("Accept", "application/json");
+                connection.setRequestProperty("apikey", BuildConfig.SUPABASE_ANON_KEY);
+                if (bearer != null) connection.setRequestProperty("Authorization", "Bearer " + bearer);
+                try (java.io.OutputStream output = connection.getOutputStream()) {
+                    output.write(body.toString().getBytes("UTF-8"));
+                }
+                int status = connection.getResponseCode();
+                java.io.InputStream stream = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
+                StringBuilder text = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, "UTF-8"))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) text.append(line);
+                }
+                response = text.length() == 0 ? new JSONObject() : new JSONObject(text.toString());
+                if (status < 200 || status >= 300) {
+                    errorMessage = response.optString("msg", response.optString("message",
+                        response.optString("error_description", "Sign-in failed. Please try again.")));
+                }
+            } catch (Exception error) {
+                errorMessage = "Could not connect to sign-in. Check your connection and try again.";
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+            JSONObject result = response;
+            String failure = errorMessage;
+            runOnUiThread(() -> callback.complete(result, failure));
+        });
+    }
+
+    private boolean applyAuthSession(JSONObject response) {
+        if (response == null) return false;
+        String accessToken = response.optString("access_token", "");
+        String refreshToken = response.optString("refresh_token", "");
+        JSONObject account = response.optJSONObject("user");
+        String email = account == null ? "" : account.optString("email", "");
+        if (accessToken.isEmpty() || email.isEmpty()) return false;
+        if (!refreshToken.isEmpty() && Build.VERSION.SDK_INT >= 23) {
+            try {
+                saveEncrypted("auth_refresh", refreshToken);
+            } catch (Exception error) {
+                Toast.makeText(this, "Secure sign-in storage is unavailable on this device.", Toast.LENGTH_LONG).show();
+                return false;
+            }
+        }
+        authAccessToken = accessToken;
+        authEmail = email;
+        preferences.edit().remove("auth_verifier").apply();
+        if (authDialog != null) {
+            authDialog.dismiss();
+            authDialog = null;
+        }
+        render();
+        return true;
+    }
+
+    private void restoreAuthSession() {
+        String refreshToken = readEncrypted("auth_refresh");
+        if (refreshToken == null || !authConfigured()) return;
+        try {
+            authRequest("/token?grant_type=refresh_token", new JSONObject().put("refresh_token", refreshToken),
+                null, (response, error) -> {
+                    if (error != null) {
+                        if (error.toLowerCase().contains("refresh token")) {
+                            preferences.edit().remove("auth_refresh").apply();
+                            Toast.makeText(this, "Your saved sign-in expired. Please sign in again.", Toast.LENGTH_LONG).show();
+                        } else {
+                            Toast.makeText(this, "Could not restore sign-in. Check your connection.", Toast.LENGTH_LONG).show();
+                        }
+                    } else applyAuthSession(response);
+                });
+        } catch (Exception error) {
+            Toast.makeText(this, "Could not restore sign-in. Check your connection.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void signOut() {
+        String token = authAccessToken;
+        authAccessToken = "";
+        authEmail = "";
+        preferences.edit().remove("auth_refresh").remove("auth_verifier").apply();
+        render();
+        if (token.isEmpty()) return;
+        try {
+            authRequest("/logout", new JSONObject(), token, (response, error) -> {
+                if (error != null) Toast.makeText(this, "Signed out on this device; remote sign-out failed.", Toast.LENGTH_LONG).show();
+            });
+        } catch (Exception error) {
+            Toast.makeText(this, "Signed out on this device; remote sign-out failed.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void saveEncrypted(String preferenceKey, String value) throws Exception {
+        if (Build.VERSION.SDK_INT < 23) {
+            if ("auth_verifier".equals(preferenceKey)) {
+                preferences.edit().putString(preferenceKey, "plain:" + value).apply();
+                return;
+            }
+            throw new IllegalStateException("Secure storage requires Android 6 or later.");
+        }
+        SecretKey key = getAuthKey();
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.ENCRYPT_MODE, key);
+        String encoded = Base64.encodeToString(cipher.getIV(), Base64.NO_WRAP) + ":"
+            + Base64.encodeToString(cipher.doFinal(value.getBytes("UTF-8")), Base64.NO_WRAP);
+        preferences.edit().putString(preferenceKey, encoded).apply();
+    }
+
+    private String readEncrypted(String preferenceKey) {
+        String encoded = preferences.getString(preferenceKey, null);
+        if (encoded == null) return null;
+        if (encoded.startsWith("plain:") && "auth_verifier".equals(preferenceKey)) return encoded.substring(6);
+        if (Build.VERSION.SDK_INT < 23) return null;
+        try {
+            String[] parts = encoded.split(":", 2);
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            cipher.init(Cipher.DECRYPT_MODE, getAuthKey(),
+                new GCMParameterSpec(128, Base64.decode(parts[0], Base64.DEFAULT)));
+            return new String(cipher.doFinal(Base64.decode(parts[1], Base64.DEFAULT)), "UTF-8");
+        } catch (Exception error) {
+            preferences.edit().remove(preferenceKey).apply();
+            Toast.makeText(this, "Saved sign-in could not be restored.", Toast.LENGTH_LONG).show();
+            return null;
+        }
+    }
+
+    private SecretKey getAuthKey() throws Exception {
+        KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+        keyStore.load(null);
+        if (keyStore.containsAlias(AUTH_KEY_ALIAS)) return (SecretKey) keyStore.getKey(AUTH_KEY_ALIAS, null);
+        KeyGenerator generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
+        generator.init(new KeyGenParameterSpec.Builder(AUTH_KEY_ALIAS,
+            KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build());
+        return generator.generateKey();
     }
 
     private void showRadio() {
