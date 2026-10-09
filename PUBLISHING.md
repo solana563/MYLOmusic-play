@@ -13,8 +13,8 @@ Keep these three in sync or the service worker will serve a stale shell:
 |---|---|
 | `index.html` → `APP = { VERSION, BUILD }` | shown in onboarding + profile |
 | `sw.js` → `const VERSION` | **bumping this evicts the old cache** |
-| `android/app/build.gradle` → `versionCode` / `versionName` | Play Store |
-| `ios/App/App/Info.plist` → `CFBundleVersion` / `CFBundleShortVersionString` | App Store |
+| Android Gradle properties `MYLO_VERSION_CODE` / `MYLO_VERSION_NAME` (defaults in `android/app/build.gradle`) | Play Store |
+| `ios/App/App.xcodeproj/project.pbxproj` → `CURRENT_PROJECT_VERSION` / `MARKETING_VERSION` | App Store |
 
 ---
 
@@ -89,14 +89,25 @@ npm run build:android:debug # Android SDK required; Gradle wrapper is included
 npm run build:android:bundle # → android/app/build/outputs/bundle/release
 ```
 
+Use JDK 17 and install Android SDK Platform 36 and Build Tools. The app targets
+API 36 to meet current Google Play target API requirements.
+
 ### Release signing (once)
 ```bash
 keytool -genkey -v -keystore mylo-release.jks -keyalg RSA \
         -keysize 2048 -validity 10000 -alias mylo
 ```
-Add `android/keystore.properties` (git-ignored), reference it from
-`android/app/build.gradle` in `signingConfigs.release`, and set
-`buildTypes.release.signingConfig signingConfigs.release`.
+Create `android/keystore.properties` (git-ignored) with these values:
+```properties
+storeFile=/absolute/path/to/mylo-release.jks
+storePassword=your-upload-key-store-password
+keyAlias=mylo
+keyPassword=your-upload-key-password
+```
+Alternatively set `MYLO_STORE_FILE`, `MYLO_STORE_PASSWORD`, `MYLO_KEY_ALIAS`,
+and `MYLO_KEY_PASSWORD` in the build environment. Release APK/AAB tasks fail
+if signing is not configured. Set release versions with Gradle properties
+`MYLO_VERSION_CODE` and `MYLO_VERSION_NAME`.
 **Back the keystore up — you cannot update the app without it.**
 
 ### Play Console
@@ -116,12 +127,16 @@ Add `android/keystore.properties` (git-ignored), reference it from
 ## 5 · iOS (App Store)
 
 ```bash
-open ios/App/App.xcodeproj
+npm run build:ios:simulator
+npm run archive:ios
 ```
 
-- Select the `MYLO` scheme and configure your Team and signing settings in Xcode.
+- Run these commands on macOS with Xcode installed; configure your Team and
+  signing settings in Xcode before archiving.
 - The target bundle ID is `com.mylo.music`; change it if your store listing uses
   a different identifier.
+- Bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in the Xcode project
+  for each release.
 - The app declares background **audio** mode and imports user-selected audio
   through the document picker; it does not request full Apple Music library
   access.
@@ -149,6 +164,12 @@ Run through these checks on **real devices**:
 ---
 
 ## 7 · Known, honest limitations
+
+The codebase includes native app projects and build commands, but a store
+submission is not complete until signed builds have been produced and tested
+on real devices and the publisher has supplied store accounts, signing
+identities, screenshots, and completed privacy/data-safety disclosures. Replace
+the publisher/support-contact placeholder in `PRIVACY.html` before publishing.
 
 These are real browser/platform restrictions, not unfinished work:
 

@@ -19,6 +19,9 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -129,7 +132,13 @@ public class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(BG);
         root.setPadding(dp(20), dp(12), dp(20), dp(8));
+        ViewCompat.setOnApplyWindowInsetsListener(root, (view, windowInsets) -> {
+            Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            view.setPadding(dp(20), dp(12) + bars.top, dp(20), dp(8) + bars.bottom);
+            return windowInsets;
+        });
         setContentView(root);
+        ViewCompat.requestApplyInsets(root);
 
         ImageView brand = new ImageView(this);
         brand.setImageResource(R.drawable.mylo_wordmark);

@@ -35,8 +35,6 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<!-- Capacitor bridge: replaced by the real native runtime inside the Android/iOS shell; harmless (no-op) on web -->
-<script>window.Capacitor=window.Capacitor||{isNativePlatform:function(){return false},Plugins:{}}</script>
 <style>
 :root{
  --vio:#e60023;--vio2:#ff1f3d;--grn1:#1d7a58;--grn2:#35b57c;
@@ -3714,7 +3712,7 @@ function installApp(){
  else if(/iPhone|iPad|iPod/.test(ua))msg='iOS Safari: tap Share → <b>Add to Home Screen</b>.';
  else if(/Firefox/.test(ua))msg='Firefox: open the ⋮ menu → <b>Install</b>.';
  else msg='Chrome / Edge: use the install icon in the address bar. Needs <b>sw.js</b> deployed next to this file (service workers can\'t be inlined — a real browser restriction, not a missing feature).';
- sheet('Install MYLO','<p class="mut" style="font-size:13.5px;line-height:1.75">'+msg+'</p><p class="mut" style="font-size:11px;margin-top:16px;line-height:1.7">Manifest + PNG icons (any &amp; maskable) are generated in-app. Long-press the home-screen icon for Radio / Library shortcuts. Native Android &amp; iOS builds come from the Capacitor wrapper (adaptive icons, splash, back button, <b>mylo://</b> deep links).</p>')}
+ sheet('Install MYLO','<p class="mut" style="font-size:13.5px;line-height:1.75">'+msg+'</p><p class="mut" style="font-size:11px;margin-top:16px;line-height:1.7">Manifest + PNG icons (any &amp; maskable) are generated during the web build. Long-press the home-screen icon for Radio / Library shortcuts. Native Android and iOS apps are separate platform-native projects.</p>')}
 
 /* ================= NATIVE (Capacitor) integration ================= */
 var CAP=window.Capacitor,isNative=!!(CAP&&CAP.isNativePlatform&&CAP.isNativePlatform());

@@ -2,6 +2,18 @@ plugins {
     id 'com.android.application'
 }
 
+def releaseSigningProperties = new Properties()
+def releaseSigningFile = rootProject.file("keystore.properties")
+if (releaseSigningFile.exists()) {
+    releaseSigningFile.withInputStream { releaseSigningProperties.load(it) }
+}
+
+def signingValue = { String name ->
+    releaseSigningProperties.getProperty(name) ?: System.getenv("MYLO_" + name.replaceAll(/([A-Z])/, '_$1').toUpperCase())
+}
+def hasReleaseSigning = ["storeFile", "storePassword", "keyAlias", "keyPassword"]
+    .every { signingValue(it) }
+
 android {
     namespace "com.mylo.music"
     compileSdkVersion rootProject.ext.compileSdkVersion
@@ -9,23 +21,48 @@ android {
         applicationId "com.mylo.music"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+        versionCode (findProperty("MYLO_VERSION_CODE") ?: "1").toInteger()
+        versionName findProperty("MYLO_VERSION_NAME") ?: "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
+    if (hasReleaseSigning) {
+        signingConfigs {
+            release {
+                storeFile rootProject.file(signingValue("storeFile"))
+                storePassword signingValue("storePassword")
+                keyAlias signingValue("keyAlias")
+                keyPassword signingValue("keyPassword")
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
 }
 
+tasks.configureEach { task ->
+    if (task.name in ["assembleRelease", "bundleRelease"] && !hasReleaseSigning) {
+        task.doFirst {
+            throw new GradleException(
+                "Release builds require Android upload-key signing. Configure android/keystore.properties " +
+                "or MYLO_STORE_FILE, MYLO_STORE_PASSWORD, MYLO_KEY_ALIAS, and MYLO_KEY_PASSWORD."
+            )
+        }
+    }
+}
+
 dependencies {
+    implementation "androidx.core:core:$androidxCoreVersion"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

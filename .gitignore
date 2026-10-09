@@ -12,7 +12,6 @@ android/build/
 android/app/build/
 android/local.properties
 android/.idea/
-android/capacitor-cordova-android-plugins/
 ios/App/Pods/
 ios/App/App/public/
 ios/App/build/

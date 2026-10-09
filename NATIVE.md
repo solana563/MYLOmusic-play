@@ -29,19 +29,24 @@ npm run build:android
 npm run build:android:bundle
 ```
 
-An Android SDK and JDK 17 are required; the committed Gradle wrapper downloads
-the pinned Gradle version. Android's document picker grants access only to
-audio files the user selects; MYLO does not request broad media-library
+Android SDK Platform 36, Build Tools, and JDK 17 are required; the committed
+Gradle wrapper downloads the pinned Gradle version. The app targets API 36 for
+current Google Play submissions. Android's document picker grants access only
+to audio files the user selects; MYLO does not request broad media-library
 permission. Internet access is used for station discovery and streams. Radio
 streams must use HTTPS.
 
 The resulting debug APK is at `android/app/build/outputs/apk/debug/`. Configure
-release signing in Android Studio before publishing a release.
+release signing before building a store bundle. Supply either
+`android/keystore.properties` (see `PUBLISHING.md`) or the documented
+`MYLO_*` environment variables. Release APK/AAB tasks intentionally fail when
+upload-key signing is not configured.
 
 ## iOS
 
 On macOS with Xcode, open `ios/App/App.xcodeproj`, select the `MYLO` scheme, and
-run or archive the app. The project targets iOS 16 and later.
+run or archive the app. The project targets iOS 16 and later. The root package
+provides `npm run build:ios:simulator` and `npm run archive:ios` commands.
 
 Audio imports are copied into the app's Documents directory. The app declares
 the audio background mode for playback. Set a valid development team and
